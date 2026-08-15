@@ -1,0 +1,268 @@
+# interface.ai take-home — Computer-Use Automation System
+
+This file is a running design log for this project: the decisions made and the reasoning behind them, captured as they were made, starting before any code existed. It doubles as project context for AI-assisted development (Claude Code) and as supporting evidence for the reasoning behind REPORT.md.
+
+For Claude Code specifically: treat this as the source of truth for "why," not just "what." Read this in full before making architectural changes.
+
+## The assignment, in one sentence
+
+Build the layer that gives an AI agent hands inside legacy bank software with no
+API: an LLM discovers how to complete a task once by driving the real UI, that
+discovery is compiled into a typed, versioned, replayable "capability" artifact,
+and that artifact is later replayed deterministically — no LLM in the decision
+loop — with proper error handling, safety guardrails, and human escalation.
+
+Full brief: see the original PDF (Assignment_A — Computer-Use Automation System).
+Do not deviate from their required deliverable paths and structure (see below).
+
+## The core mental model
+
+Two separate programs share one data structure:
+
+- **Discovery** (`agent.discover`): LLM-driven observe → decide → act loop
+  against a live browser. Slow, non-deterministic, run once per capability.
+  Produces a typed artifact.
+- **Replay** (`agent.replay`): given a saved artifact + input params, executes
+  the recorded steps against the live UI with the LLM completely out of the
+  decision loop. Fast, deterministic, run on every production invocation.
+
+The artifact is the product. It's a capability contract (like a function
+signature), not a macro recording — typed inputs, typed outputs, ordered steps
+with ranked locator fallbacks, per-step checkpoints, declared expected business
+outcomes, a risk classification, guardrails, and an escalation policy.
+
+## What's actually being graded (in weighted order)
+
+1. System design — the artifact schema and replay contract are explicitly
+   called out as "a focal point of the evaluation." Do not treat this as
+   boilerplate.
+2. Correctness of the core loop — agent completes a real goal; artifact
+   replays deterministically and verifies success.
+3. Robustness & error handling — see the three-way outcome taxonomy below.
+   This is where most submissions will be weak; do not be one of them.
+4. Human-in-the-loop escalation — must transfer control of the SAME live
+   session, not a fresh one. "Not just a TODO" is a direct quote from the brief.
+5. Generalization to the real environment (design-only, in REPORT.md) —
+   heterogeneous surfaces (web/legacy web/desktop) and multi-tenant reuse.
+6. Safety & data handling — allowlist enforcement, risky/irreversible action
+   handling, redaction of regulated financial data.
+7. Code quality, then Communication (the REPORT.md write-up).
+
+They explicitly do NOT reward feature breadth, framework name-dropping, or
+building scaling infrastructure (queues, clusters, multi-tenant plumbing).
+Depth on the load-bearing pieces beats breadth across everything.
+
+## Key design decisions already made
+
+### Target application: custom-built, deliberately hostile local bank app
+
+Decision: build our own small local web app rather than use a real bank
+system (explicitly forbidden in the brief, Section 4/9) or a clean public
+demo site (too easy, doesn't exercise the interesting problems).
+
+The target app should include:
+- A non-trivial multi-step flow: search member → results → detail →
+  read balance (mirrors their own example goal exactly).
+- Deliberately hostile markup: nested tables, an iframe, non-semantic class
+  names, no test IDs — but WITH accessibility roles/labels present (ARIA),
+  since the perception strategy below depends on the accessibility tree
+  being usable, same as it would be on a real legacy enterprise app.
+- Seeded failure states, reachable on demand for evidence capture:
+  - a member ID that returns "not found" (business outcome)
+  - a member ID that returns "access denied" (business outcome)
+  - a member ID that triggers a slow/hanging load (recoverable condition)
+  - a member ID that triggers a surprise interstitial/dialog (recoverable
+    condition, or escalation trigger depending on step)
+- Optionally, a second "Tenant B" variant (same flow, different branding/
+  labels/layout) if we pursue the cross-tenant stretch goal.
+
+Rationale for rejecting a real bank app: explicitly forbidden by the brief;
+would undercut every safety argument in the write-up; real credentials/PII
+would land in evidence artifacts, which is the exact thing being scored
+against. This is documented, not silently assumed — restate this reasoning
+in REPORT.md Section 7 (Cuts) if asked "why not real/public target."
+
+Considered and rejected: self-hosting Apache Fineract + Mifos X Community
+App (real open-source core banking software) as a middle path. Valid
+alternative if the custom app proves too limited, but decision was made to
+proceed with the custom app for full control over failure injection and to
+directly hit every stretch goal surface. Keep this option in mind if the
+custom app's timeline balloons.
+
+### Perception mechanism: accessibility tree primary, screenshot evidence, CSS fallback
+
+Locators are ranked lists, tried in priority order:
+1. Accessibility tree (role + accessible name) — most stable, matches how
+   this would extend to legacy web AND desktop apps (Windows UIA exposes
+   the same abstraction), which is the direct answer to the Heterogeneity
+   section of REPORT.md.
+2. Text label match — human-readable fallback.
+3. CSS selector — last resort, most brittle, still logged and available.
+
+Every locator attempt (success or failure, which strategy worked) gets
+logged. This becomes the drift-detection signal later: if a capability
+keeps falling through to its fallback locator, that's an early warning of
+UI change before it becomes an outright failure.
+
+### Language/stack: Python
+
+- Playwright for browser automation (exposes accessibility snapshot,
+  auto-waiting).
+- Pydantic for typed, versioned, JSON-serializable artifact models —
+  validation comes near-free and doubles as schema documentation.
+- LLM: TBD — pick based on tool-use/function-calling quality and cost for
+  a bounded discovery loop (max ~25 steps).
+
+### Artifact schema — FINALIZED, see schema/example_artifact.json
+
+Format: JSON. Full worked example for the `member_balance_lookup`
+capability is at `schema/example_artifact.json` in this repo — read it
+before implementing the Pydantic models; it is the reference for field
+names and nesting.
+
+Key structural decisions and why:
+
+- **Per-step checkpoints**, not one checkpoint at the end. Chosen so replay
+  failures are debuggable at the step level ("step 4 failed: expected a
+  rendered results table, got a JS error") rather than only knowing the
+  whole flow didn't finish.
+- **Ranked locator fallback lists per step** (see Perception section above),
+  not a single locator per step.
+- **`risk_class`** declared once at the artifact level (`read_only` /
+  `mutating` / etc.) — drives whether guardrails require confirmation
+  before the capability runs at all.
+- **`expected_outcomes`** declared up front at the artifact level, each with
+  its own `detection` rule, and referenced from step checkpoints via
+  `outcome_match`. This is the single most important idea in the schema:
+  it is how "no such member" is recognized as a legitimate result rather
+  than discovered/improvised as an error at replay time. Do not collapse
+  this into generic try/catch error handling in the executor — the
+  expected-outcome detection must be data-driven from the artifact.
+- **`guardrails`** (allowlist routes, allowed action types, confirmation
+  requirement) live on the artifact itself, not only in a global config —
+  defense in depth, a capability can't run outside the routes it was
+  actually discovered against even if the global config is misconfigured.
+- **`evidence_policy`** declares what gets screenshotted on failure and
+  which fields must always be redacted — structural, not left to
+  "remember to scrub it in code."
+- **`escalation_policy`**: artifact-level `default` policy (retry counts,
+  what triggers escalation — checkpoint failure, unrecognized dialog, step
+  timeout, hard failure) with optional per-step `escalation_override` for
+  steps that need different behavior (e.g. a step on a mutating capability
+  where any unexpected dialog should escalate immediately with zero
+  retries, since it might be an unexpected confirmation prompt for an
+  irreversible action). Chosen over (a) requiring an explicit policy on
+  every step — too much repetitive boilerplate on an artifact meant to be
+  human-reviewed — and (b) no artifact-level modeling at all — would be
+  inconsistent with `risk_class` already existing on the artifact; if the
+  artifact already knows a step is risky, it needs a way to act on that
+  knowledge.
+
+Discovery does NOT need to know about escalation policy at record time —
+this only matters to replay running unattended in production. Reasonable
+defaults apply automatically; authors only add `escalation_override` when
+a specific step's risk profile genuinely differs from the default.
+
+## The result-outcome taxonomy (applies to the replay engine's return type)
+
+Every replay run must resolve to exactly one of three categories. Getting
+this distinction right/wrong is called out as "the most common design
+mistake" in the brief's own glossary. Do not conflate any of these:
+
+1. **Business outcome** — the automation worked correctly and reached a
+   legitimate, expected end state that isn't the happy path. E.g. "member
+   not found," "access denied." Detected via the artifact's
+   `expected_outcomes`. Returned as a normal successful result, just with
+   a different outcome code — never as an error/exception.
+2. **Recoverable condition** — a known, handleable runtime blip: dismiss a
+   known interstitial, wait out a slow load, retry a transient failure.
+   Handled silently per the escalation_policy retry counts, execution
+   continues.
+3. **Hard failure** — something genuinely unexpected. Stop, and return
+   enough to debug: which step, what locator/checkpoint was expected, what
+   was actually observed, plus a screenshot per `evidence_policy`.
+
+## Human escalation / control-transfer model
+
+Requirement: when escalating, a human must take over the SAME live browser
+session the automation was using (preserves login state, navigation
+history, partially-filled forms) — not a fresh session.
+
+Model: explicit session ownership state, e.g. `owner: automation | human`.
+While `owner == human`, the automation loop blocks and does nothing. The
+human works in that live window via a (can be minimal/mocked) operator
+surface, then signals resume (e.g. hits a "done, resume" button), flipping
+ownership back to `automation`, which then continues from the step it
+paused on. Preserve context/evidence across the handoff; log what the
+human did.
+
+A full real-time co-browsing console is explicitly out of scope per the
+brief — a bare/mocked operator UI is fine as long as the handoff mechanism
+and control-transfer model are real and well-reasoned, which they are meant
+to be the focus of, not the UI polish.
+
+## Safety guardrails (Section 3.4 of the brief)
+
+- Explicit, configurable allowlist of permitted domains/routes and
+  permitted action types, enforced at the point of action (in the
+  executor/action functions), not just suggested via prompt.
+- Actions classified safe/reversible vs. risky/irreversible
+  (`risk_class` at the artifact level, potentially finer-grained later).
+  Current stance: risky/irreversible actions are blocked or require
+  explicit human confirmation before executing — conservative by design.
+  Document and defend this choice in REPORT.md.
+- Never persist secrets or raw sensitive data (credentials, tokens, full
+  PII) into artifacts or logs — enforced via `evidence_policy.redact_fields`
+  plus a redaction pass before anything is written to disk.
+
+## Deliverables — exact required structure, do not deviate
+
+- `/README.md` — setup instructions (keys/config needed, how to run
+  without live services if applicable), and the exact demo command(s):
+  run the agent on a goal, then replay the resulting artifact.
+- `/REPORT.md` — 1–3 pages, exactly these seven headings in this order:
+  1. Architecture
+  2. Artifact schema
+  3. Determinism & error handling
+  4. Heterogeneity & multi-tenant
+  5. Escalation & handoff
+  6. Safety
+  7. Cuts
+- `/evidence/` — a saved example artifact, logs from a discovery run AND a
+  replay run, and ideally one replay that hits an error/exceptional state
+  (bad input, not-found result, or injected failure) to demonstrate the
+  outcome taxonomy actually works. Screen recording optional.
+
+At least one discovery run must be a genuine LLM-driven run against a live
+surface — this cannot be faked, described, or mocked. Everything else in
+Section 3 of the brief can be stubbed at a clean, documented seam if time
+runs short (operator console UI, desktop surface support, multi-tenant
+infrastructure) — but the seam and reasoning must be real.
+
+## Build order (agreed sequence)
+
+1. Build the target app first (custom hostile bank app w/ seeded failures).
+2. Design/finalize artifact schema on paper before writing agent code —
+   DONE, see schema/example_artifact.json.
+3. Build the replay engine before the agent loop — it defines what a "step"
+   and "action" vocabulary means; the agent just needs to emit into that
+   vocabulary.
+4. Build the discovery agent loop (tool-use style: observe/click/type/
+   navigate/extract, each action gated through the guardrail check).
+5. Build the artifact compiler — turns a successful discovery trajectory
+   into a parameterized artifact (detect which typed values came from the
+   goal's inputs and templatize them, e.g. `{{member_id}}`).
+6. Error handling, outcome taxonomy, escalation/handoff mechanism.
+7. Safety pass, evidence capture, then REPORT.md.
+
+## Open / not yet decided
+
+- Exact LLM provider/model for the discovery loop.
+- Exact detection implementation details for `checkpoint` and
+  `expected_outcomes.detection` types (the schema defines the vocabulary;
+  the executor needs to implement each `type` value as real logic).
+- Whether to pursue any stretch goal, and which one (pick at most one —
+  agent-facing capability catalog and cross-tenant reuse are the two most
+  aligned with the brief's core thesis).
+- Whether to fall back to self-hosted Apache Fineract/Mifos as target app
+  if the custom app's scope grows too large (see Target application above).
