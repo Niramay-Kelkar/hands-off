@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}First Meridian Trust &amp; Savings{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='legacy.css') }}">
+</head>
+<body>
+<table class="pageshell" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="topbar" colspan="2">
+      <table class="hdrTbl" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="logo">First Meridian Trust &amp; Savings</td>
+          <td class="hdrRight">Member Services Portal</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td class="lhs">
+      <iframe class="sidebarFrame" src="{{ url_for('branch_notice') }}" title="Branch Notices"></iframe>
+    </td>
+    <td class="content">
+      {% block content %}{% endblock %}
+    </td>
+  </tr>
+</table>
+</body>
+</html>

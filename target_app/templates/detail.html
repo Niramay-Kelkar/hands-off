@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% block content %}
+<table class="dtlOuter" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="dtlCell">
+      <h2>Member Detail</h2>
+      <table class="dtl" cellpadding="0" cellspacing="0" border="0">
+        <tbody>
+          <tr><td class="lbl">Name:</td><td class="member-name">{{ member.name }}</td></tr>
+          <tr><td class="lbl">Savings Balance:</td><td class="savings-balance">${{ '%.2f'|format(member.savings_balance) }}</td></tr>
+        </tbody>
+      </table>
+    </td>
+  </tr>
+</table>
+
+{% if interstitial %}
+<div class="modalOverlay">
+  <div class="modalBox" role="dialog" aria-modal="true" aria-label="Notice">
+    <p>This record requires additional verification before it can be displayed. Please confirm to continue.</p>
+    <button type="button" class="modalDismiss" onclick="document.querySelector('.modalOverlay').style.display='none';">Continue</button>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

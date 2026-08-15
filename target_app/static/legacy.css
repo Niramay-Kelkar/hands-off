@@ -1,0 +1,123 @@
+body {
+  font-family: Verdana, Geneva, sans-serif;
+  font-size: 12px;
+  color: #1a1a1a;
+  background: #d9d9c8;
+  margin: 0;
+}
+
+.pageshell {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.topbar .hdrTbl {
+  width: 100%;
+  background: #2b3a5c;
+  color: #fff;
+}
+
+.hdrTbl .logo {
+  padding: 8px 12px;
+  font-weight: bold;
+}
+
+.hdrTbl .hdrRight {
+  padding: 8px 12px;
+  text-align: right;
+}
+
+.lhs {
+  width: 180px;
+  vertical-align: top;
+  background: #c8c8b8;
+  padding: 6px;
+}
+
+.sidebarFrame {
+  width: 100%;
+  height: 160px;
+  border: 1px solid #888;
+}
+
+.content {
+  vertical-align: top;
+  padding: 12px;
+}
+
+.frmInner .lbl1 {
+  padding-right: 6px;
+}
+
+.frmInner .fld1 input {
+  padding: 2px 4px;
+}
+
+.results {
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.results td {
+  border: 1px solid #999;
+  padding: 4px 8px;
+}
+
+.pageBanner {
+  background: #7a1f1f;
+  color: #fff;
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.noRes {
+  font-style: italic;
+}
+
+.dtl {
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.dtl td {
+  border: 1px solid #999;
+  padding: 4px 8px;
+}
+
+.dtl .lbl {
+  font-weight: bold;
+  background: #eee;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalBox {
+  background: #fff;
+  border: 2px solid #2b3a5c;
+  padding: 16px;
+  max-width: 320px;
+}
+
+.noticeTbl {
+  width: 100%;
+}
+
+.noticeHdr {
+  font-weight: bold;
+  padding: 4px;
+}
+
+.noticeBody {
+  padding: 4px;
+  font-size: 11px;
+}

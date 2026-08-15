@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block content %}
+<table class="frmOuter" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="frmCell">
+      <form action="{{ url_for('members_search') }}" method="get" class="srch">
+        <table class="frmInner" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td class="lbl1"><label for="memberIdSearch">Member ID</label></td>
+            <td class="fld1"><input id="memberIdSearch" name="member_id" type="text" value="{{ member_id }}"></td>
+            <td class="btnCell"><button type="submit" class="search-btn">Search</button></td>
+          </tr>
+        </table>
+      </form>
+    </td>
+  </tr>
+</table>
+
+{% if searched %}
+<table class="resWrapOuter" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="resWrapCell">
+      {% if outcome == 'access_denied' %}
+        <div class="pageBanner" role="alert">You do not have permission to view this member.</div>
+      {% elif outcome == 'not_found' %}
+        <div class="resultsRegion">
+          <p class="noRes">No records found</p>
+        </div>
+      {% elif result %}
+        <div class="resultsRegion">
+          <table class="results" aria-label="Search results" cellpadding="0" cellspacing="0" border="0">
+            <tbody>
+              <tr>
+                <td class="c1"><a href="{{ url_for('member_detail', member_id=result.id) }}">{{ result.id }}</a></td>
+                <td class="c2">{{ result.name }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+{% endif %}
+{% endblock %}
