@@ -174,46 +174,12 @@ above), `guardrails.py`, `escalation.py`, `operator_console.py`,
 `engine.py` (`run_capability` orchestration), `replay.py` (CLI). Run:
 `python -m agent.replay --capability <path> --input k=v [...]`.
 
-Real implementation decisions made while building this (the schema left
-these open on purpose — see "Open / not yet decided" below, now trimmed):
-
-- **`text_present` scope resolution**: `scope: "page"` searches
-  `page.locator("body").inner_text()` — main frame only; iframe content
-  is never included because an iframe renders a separate document, not
-  because anything filters it out. Any other scope value is looked up as
-  `role="region"` + matching `aria-label` on the current page, falling
-  back to whole-page search (with a logged warning) if not found. This
-  makes `detection.scope` a contract with the target app's `aria-label`
-  regions — target_app/README.md documents it from the app side.
-- **Unrecognized-dialog detection is a proactive interrupt, not a
-  fallback explanation for checkpoint failure.** It's checked
-  (`role="dialog"` / `role="alertdialog"` visible) immediately after a
-  step's action, *before* checkpoint evaluation — because a modal
-  overlay doesn't reliably fail a plain Playwright visibility check, so
-  a checkpoint can pass right through a dialog it should have caught.
-- **Each step splits into an ACT phase (resolve locator + perform the
-  action) and a CHECK phase (dialog interrupt + checkpoint eval), each
-  with its own retry/escalate handling.** Both automatic retries and a
-  human's "resume" only ever redo the CHECK phase, never re-run the
-  action. This matters twice over: an automatic retry must not
-  double-click a button that already registered, and a human who
-  resumes an escalated run has typically just fixed the live page in
-  place (e.g. dismissed a dialog) — re-evaluating what's on screen now
-  is correct, blindly repeating the original click is not. Verified by
-  driving a run to a paused interstitial, attaching to the *same* live
-  browser over CDP to dismiss the dialog exactly as a human physically
-  would, and confirming the resumed run re-checks rather than re-clicks.
-- **Extraction for an accessibility `role: "text"` match reads the next
-  DOM sibling cell**, not the matched node's own text — the match is a
-  label anchor (e.g. "Name:") in this app's label/value table layout,
-  the value lives in the following `<td>`. CSS fallback selectors target
-  the value cell directly, so no sibling hop is needed there.
-- **`money`-typed outputs get `$`/comma-stripped and parsed to `float`**
-  during extraction; other output types pass through as extracted text.
-- **Initial navigation to `target.entry_point` is wrapped the same as
-  any step** — a failed navigation produces a `HardFailureResult`
-  (`step_id: 0`), not an uncaught exception, so the "always exactly one
-  of three shapes" contract holds even before step 1 runs.
+Each step splits into an ACT phase (resolve locator + perform the
+action) and a CHECK phase (unrecognized-dialog interrupt, then
+checkpoint eval), each with its own retry/escalate handling — retries,
+automatic or human-resumed, only ever redo CHECK, never re-run the
+action. `text_present`'s `scope` is a contract with the target app's
+`aria-label` regions (see target_app/README.md).
 
 Cut, for REPORT.md: one process owns the Playwright browser end to end,
 headed, no RPC. Escalation is a shared SQLite `runs` table
@@ -224,6 +190,9 @@ the same table. If the replay process dies while paused, the browser
 goes with it; a production version would separate the browser process
 from the replay/orchestration process so a paused session survives an
 orchestrator restart.
+
+See BUILD_LOG.md for build history: what was verified against which
+seeded target_app cases, bugs found, and how they were fixed.
 
 ## The result-outcome taxonomy (applies to the replay engine's return type)
 
@@ -311,17 +280,52 @@ infrastructure) — but the seam and reasoning must be real.
    vocabulary. DONE, see "Replay engine — built (agent/)" above.
 4. Build the discovery agent loop (tool-use style: observe/click/type/
    navigate/extract, each action gated through the guardrail check).
+   DONE, see "Discovery agent — built (agent/)" below.
 5. Build the artifact compiler — turns a successful discovery trajectory
    into a parameterized artifact (detect which typed values came from the
    goal's inputs and templatize them, e.g. `{{member_id}}`).
 6. Error handling, outcome taxonomy, escalation/handoff mechanism.
 7. Safety pass, evidence capture, then REPORT.md.
 
+## Discovery agent — built (agent/)
+
+`agent/discover.py` (CLI) drives `agent/discovery.py`'s observe -> decide
+-> act loop against the Anthropic Messages API (Claude Sonnet 5), one
+tool call per turn (`tool_choice: "any"`, parallel tool use disabled) —
+never free-form text parsed for intent. Perception is text, not a
+screenshot: `agent/perception.py` wraps Playwright's
+`locator("body").aria_snapshot()`, the same role+accessible-name
+representation replay's locators are built from. Tool vocabulary
+(`agent/discovery_tools.py`) matches `agent.actions.ACTION_REGISTRY`
+(click/type/navigate/extract) plus `done`. Guardrails are enforced the
+same way as replay (`agent/guardrails.py`, now taking primitives so both
+callers share one code path), with one addition: a `click` that triggers
+off-allowlist navigation is reverted, not just flagged, since discovery
+is open-ended exploration where containing-and-continuing beats aborting
+the run. Output: a `Trajectory` (`agent/trajectory.py`) — raw discovery
+material, not a compiled artifact; run: `python -m agent.discover --goal
+"..." --target <url> --out <path>`.
+
+See BUILD_LOG.md for build history, including a security gap found and
+fixed during this phase (route allowlist checking ignored origin).
+
 ## Open / not yet decided
 
-- Exact LLM provider/model for the discovery loop.
 - Whether to pursue any stretch goal, and which one (pick at most one —
   agent-facing capability catalog and cross-tenant reuse are the two most
   aligned with the brief's core thesis).
+- Compiler phase: the compiled artifact's `guardrails.allowlist_routes`
+  should be narrowed to the routes actually visited during the
+  successful trajectory, not carried over as discovery-time's wide-open
+  `"/*"` — discovery needs room to explore, but a replayable capability
+  should only be allowed back onto the exact routes it was proven
+  against.
+- Compiler phase: a trajectory can reach `done` with correct-looking
+  outputs that were never actually verified by a successful `extract`
+  call (the model can just restate what it read in its own observation
+  text after an `extract` fails — seen in the first live discovery run,
+  see BUILD_LOG.md). The compiler needs a policy: outputs without a
+  clean, verified extract step probably shouldn't become an artifact
+  `extract` step at all.
 - Whether to fall back to self-hosted Apache Fineract/Mifos as target app
   if the custom app's scope grows too large (see Target application above).

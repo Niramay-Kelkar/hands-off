@@ -78,16 +78,19 @@ def run_capability(artifact: Capability, raw_params: dict[str, str], *, headed: 
     log = StepLogWriter(rdir / "log.jsonl", artifact.evidence_policy.redact_fields)
     log.event("run_start", capability_id=artifact.capability_id, version=artifact.version, params=params)
     escalation.open_session(run_id, artifact.capability_id)
+    allowed_origin = guardrails.derive_origin(artifact.target.entry_point)
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not headed)
         page = browser.new_page()
-        ctx = RunContext(page=page, artifact=artifact, params=params, run_id=run_id, evidence_dir=rdir, log=log)
+        ctx = RunContext(
+            page=page, artifact=artifact, params=params, run_id=run_id, evidence_dir=rdir, log=log, allowed_origin=allowed_origin
+        )
 
         try:
             try:
                 page.goto(artifact.target.entry_point)
-                guardrails.check_route(page.url, artifact)
+                guardrails.check_route(page.url, ctx.allowed_origin, artifact.guardrails.allowlist_routes)
             except Exception as exc:
                 log.event("entry_navigation_failed", detail=str(exc)[:300])
                 screenshot_path = None
@@ -182,11 +185,11 @@ def _act_once(step: Step, ctx: RunContext) -> tuple:
         if step.locator is not None:
             resolved = resolve_locator(step.locator.strategies, ctx)
 
-        guardrails.check_action_type(step.action, ctx.artifact)
+        guardrails.check_action_type(step.action.type, ctx.artifact.guardrails.allowed_action_types)
         before_url = ctx.page.url
         ACTION_REGISTRY.get(step.action.type)(step.action, resolved, ctx)
         if ctx.page.url != before_url:
-            guardrails.check_route(ctx.page.url, ctx.artifact)
+            guardrails.check_route(ctx.page.url, ctx.allowed_origin, ctx.artifact.guardrails.allowlist_routes)
 
         if step.wait is not None and step.wait.type == "network_idle":
             ctx.page.wait_for_load_state("networkidle", timeout=step.wait.timeout_ms)

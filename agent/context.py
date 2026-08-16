@@ -1,5 +1,6 @@
-"""RunContext — the single object threaded through locator resolution,
-checkpoint evaluation, and action execution for one replay run."""
+"""Per-run context objects threaded through locator resolution, checkpoint
+evaluation, and action execution — RunContext for replay, DiscoveryContext
+for the discovery agent loop."""
 
 from __future__ import annotations
 
@@ -21,4 +22,17 @@ class RunContext:
     run_id: str
     evidence_dir: Path
     log: StepLogWriter
+    allowed_origin: str
+    outputs: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class DiscoveryContext:
+    page: Page
+    run_id: str
+    evidence_dir: Path
+    log: StepLogWriter
+    allowed_origin: str
+    allowlist_routes: list[str]
+    allowed_action_types: list[str]
     outputs: dict[str, Any] = field(default_factory=dict)
