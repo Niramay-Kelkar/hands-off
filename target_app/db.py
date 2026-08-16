@@ -21,7 +21,7 @@ def get_member(member_id: str) -> sqlite3.Row | None:
     conn = get_connection()
     try:
         cur = conn.execute(
-            "SELECT id, name, savings_balance, access_denied FROM members WHERE id = ?",
+            "SELECT id, name, savings_balance, access_denied, account_number FROM members WHERE id = ?",
             (member_id,),
         )
         return cur.fetchone()

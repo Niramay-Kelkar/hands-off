@@ -40,6 +40,7 @@ INTERSTITIAL_FIXTURE = {
     "id": INTERSTITIAL_ID,
     "name": "Pat Whitfield",
     "savings_balance": 2310.00,
+    "account_number": "6604215938",
 }
 
 
@@ -67,6 +68,7 @@ def members_search():
                     "id": row["id"],
                     "name": row["name"],
                     "savings_balance": row["savings_balance"],
+                    "account_number": row["account_number"],
                 }
 
     return render_template(
@@ -93,6 +95,7 @@ def member_detail(member_id):
         "id": row["id"],
         "name": row["name"],
         "savings_balance": row["savings_balance"],
+        "account_number": row["account_number"],
     }
     return render_template("detail.html", member=member, interstitial=False)
 

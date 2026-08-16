@@ -319,3 +319,78 @@ response pairs (catalog + both invokes) saved as curated evidence under
 implementation.
 
 **Committed:** pending.
+
+---
+
+## 2026-08-16 — Safety pass: redaction and risk gating, closed not just documented
+
+Both items below were previously documented as design stances in
+CLAUDE.md but never actually exercised against real data or enforced by
+the engine — this phase closed both gaps for real.
+
+**Redaction.** Added a genuine sensitive field to `target_app`: an
+unmasked `account_number` column, shown on the member detail page like
+a real teller-facing app would, seeded with realistic values (`10001` ->
+`4471882203`), never a declared output of `member_balance_lookup`. Built
+`agent/redaction.py` (`find_sensitive_fields`, DOM-scan based — matches
+live label cells against `redact_fields`, returns the real value *and* a
+Playwright `Locator` on it) and `mask_text`. Wired in three places:
+`agent/perception.py`'s `observe()` masks discovery's full
+accessibility-tree dump at the source (so the live model conversation
+and everything persisted from it share one masked copy — a later
+addition to the original plan, at effectively zero cost since nothing
+in this capability needs the real value); `agent/evidence.py`'s
+`StepLogWriter` gained an optional attached `page` and rescans on every
+`log.jsonl` event as defense-in-depth, covering every existing
+`log.event()` call site with no changes to `actions.py`/`checkpoints.py`/
+`locators.py`; `evidence.save_screenshot()` gained `mask_locators`,
+using Playwright's native `mask=`/`mask_color=` screenshot parameters
+(confirmed working before committing to the approach) rather than
+manual `bounding_box()` compositing — same visual effect, no image
+library, correctly handles scroll/DPI.
+
+**Verified against real data, not just console output**: ran discovery
+against `member_id=10001` (reaches the detail page) and checked all
+three persistence points directly — `grep`'d the raw account number
+`4471882203` in the trajectory JSON (0 matches) and `log.jsonl` (0
+matches), confirmed `[REDACTED]` present in both (3 matches each), and
+visually confirmed the screenshot shows a solid black block over the
+account number row while Name/Savings Balance stay fully legible.
+
+**Bug found and fixed during verification**: the first discovery run
+crashed with `Event loop is closed! Is Playwright already stopped?`.
+Cause: `run_discovery`'s final `log.event("run_end", ...)` call happens
+*after* the `with sync_playwright()` block exits (browser and driver
+both stopped), but `StepLogWriter` still held the now-dead `page`
+reference from `attach_page()` and tried to rescan it. Fixed by calling
+`log.attach_page(None)` in the `finally` block right before
+`browser.close()`. `engine.py` doesn't have the equivalent bug — every
+`log.event()` call there happens before its `browser.close()`, checked
+directly by reading the call order rather than assuming.
+
+**Risk gating.** Confirmed `engine.py` never checked `risk_class` or
+`guardrails.requires_confirmation` anywhere — a real gap between what
+the schema declares and what the engine enforces. Fixed: `run_capability`
+now checks, right after entry navigation succeeds and before the step
+loop starts, whether `risk_class != "read_only"` or
+`requires_confirmation` is true, and if so calls the *existing*
+`escalation.pause_for_escalation()` (step `0`, reason
+`"risk_confirmation_required"`) — reusing the same operator-console
+mechanism already built for mid-run escalation, just triggered
+pre-emptively.
+
+**Verified** with a synthetic in-memory `Capability` (not shipped code —
+`risk_class: "mutating"`, one trivial click step, constructed directly
+via the Pydantic models) run through the real `engine.run_capability()`:
+confirmed via `escalation.latest_paused_run()` and the run's own
+`log.jsonl` that it paused at step `0` with `risk_confirmation_required`
+*before* any `locator_resolved`/`action` event existed in the log (i.e.
+truly before the first action, not just before its result), resumed it,
+and confirmed the click then executed and the run completed
+(`log.jsonl`: `risk_gate_pause` -> `risk_gate_resumed` ->
+`locator_resolved` -> `action` -> `checkpoint` -> `run_end`). Re-ran
+`member_balance_lookup` (`read_only`) immediately after — succeeded with
+zero pause and zero behavior change, confirming the gate only engages
+where it should.
+
+**Committed:** pending.

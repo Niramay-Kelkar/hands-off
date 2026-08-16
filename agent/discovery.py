@@ -15,7 +15,7 @@ from pathlib import Path
 import anthropic
 from playwright.sync_api import sync_playwright
 
-from agent import evidence, guardrails, perception
+from agent import evidence, guardrails, perception, redaction
 from agent.context import DiscoveryContext
 from agent.discovery_tools import DISCOVERY_TOOL_REGISTRY, TOOL_SCHEMAS, ToolOutcome
 from agent.evidence import StepLogWriter
@@ -78,6 +78,7 @@ def run_discovery(
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not headed)
         page = browser.new_page()
+        log.attach_page(page)
         ctx = DiscoveryContext(
             page=page,
             run_id=run_id,
@@ -100,7 +101,7 @@ def run_discovery(
                 trajectory.save(out_path)
             return trajectory
 
-        observation = perception.observe(page)
+        observation = perception.observe(page, redact_fields=DEFAULT_REDACT_FIELDS)
         log.event("observation", step_index=0, observation=observation)
 
         messages: list[dict] = [{"role": "user", "content": f"Goal: {goal}\n\nCurrent page:\n{observation}"}]
@@ -120,7 +121,11 @@ def run_discovery(
                 tool_use = next((b for b in response.content if b.type == "tool_use"), None)
                 model_text = "\n".join(b.text for b in response.content if b.type == "text")
 
-                screenshot_path = evidence.save_screenshot(page, rdir, step_index, "step")
+                sensitive = redaction.find_sensitive_fields(page, DEFAULT_REDACT_FIELDS)
+                model_text = redaction.mask_text(model_text, sensitive)
+                screenshot_path = evidence.save_screenshot(
+                    page, rdir, step_index, "step", mask_locators=[f.locator for f in sensitive]
+                )
 
                 if tool_use is None:
                     # shouldn't happen with tool_choice="any", but guard anyway
@@ -152,7 +157,7 @@ def run_discovery(
                     trajectory.final_summary = outcome.detail
                     break
 
-                observation = perception.observe(page)
+                observation = perception.observe(page, redact_fields=DEFAULT_REDACT_FIELDS)
                 log.event("observation", step_index=step_index, observation=observation)
                 messages.append(
                     {
@@ -171,6 +176,7 @@ def run_discovery(
                 trajectory.status = "max_steps_reached"
                 trajectory.final_summary = f"stopped after {max_steps} steps without calling done"
         finally:
+            log.attach_page(None)  # about to go dead — later log.event() calls must not try to scan it
             browser.close()
 
     trajectory.ended_at = datetime.now(timezone.utc)

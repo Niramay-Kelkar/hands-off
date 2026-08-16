@@ -27,7 +27,7 @@ from typing import Callable
 from playwright.sync_api import TimeoutError as PWTimeoutError
 from playwright.sync_api import sync_playwright
 
-from agent import escalation, evidence, guardrails
+from agent import escalation, evidence, guardrails, redaction
 from agent.actions import ACTION_REGISTRY
 from agent.checkpoints import evaluate_checkpoint
 from agent.context import RunContext
@@ -83,6 +83,7 @@ def run_capability(artifact: Capability, raw_params: dict[str, str], *, headed: 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not headed)
         page = browser.new_page()
+        log.attach_page(page)
         ctx = RunContext(
             page=page, artifact=artifact, params=params, run_id=run_id, evidence_dir=rdir, log=log, allowed_origin=allowed_origin
         )
@@ -95,7 +96,10 @@ def run_capability(artifact: Capability, raw_params: dict[str, str], *, headed: 
                 log.event("entry_navigation_failed", detail=str(exc)[:300])
                 screenshot_path = None
                 if "hard_failure" in artifact.evidence_policy.screenshot_on:
-                    screenshot_path = evidence.save_screenshot(page, rdir, 0, "hard_failure")
+                    sensitive = redaction.find_sensitive_fields(page, artifact.evidence_policy.redact_fields)
+                    screenshot_path = evidence.save_screenshot(
+                        page, rdir, 0, "hard_failure", mask_locators=[f.locator for f in sensitive]
+                    )
                 result = HardFailureResult(
                     step_id=0,
                     expected=f"navigate to entry_point {artifact.target.entry_point!r}",
@@ -105,6 +109,26 @@ def run_capability(artifact: Capability, raw_params: dict[str, str], *, headed: 
                 log.event("run_end", status=result.status)
                 escalation.complete_session(run_id, result.status)
                 return result
+
+            # Risk gate: a capability that isn't declared read_only, or that
+            # explicitly requires confirmation, must not run unattended —
+            # route straight to the same escalation/operator-console path
+            # used mid-run, but before the first action executes. Navigation
+            # already happened so the operator has real page context to
+            # review, not a blank browser.
+            if artifact.risk_class != "read_only" or artifact.guardrails.requires_confirmation:
+                sensitive = redaction.find_sensitive_fields(page, artifact.evidence_policy.redact_fields)
+                screenshot_path = evidence.save_screenshot(
+                    page, rdir, 0, "risk_confirmation_required", mask_locators=[f.locator for f in sensitive]
+                )
+                log.event(
+                    "risk_gate_pause",
+                    risk_class=artifact.risk_class,
+                    requires_confirmation=artifact.guardrails.requires_confirmation,
+                    screenshot=screenshot_path,
+                )
+                escalation.pause_for_escalation(run_id, 0, "risk_confirmation_required", screenshot_path)
+                log.event("risk_gate_resumed")
 
             for step in artifact.steps:
                 result = _execute_step(step, ctx)
@@ -158,7 +182,10 @@ def _run_with_escalation(
             continue
 
         if rule.then == "escalate":
-            screenshot_path = evidence.save_screenshot(ctx.page, ctx.evidence_dir, step.step_id, trigger)
+            sensitive = redaction.find_sensitive_fields(ctx.page, ctx.artifact.evidence_policy.redact_fields)
+            screenshot_path = evidence.save_screenshot(
+                ctx.page, ctx.evidence_dir, step.step_id, trigger, mask_locators=[f.locator for f in sensitive]
+            )
             ctx.log.event(
                 "escalate", step_id=step.step_id, trigger=trigger, detail=detail, screenshot=screenshot_path
             )
@@ -169,7 +196,10 @@ def _run_with_escalation(
 
         screenshot_path = None
         if "hard_failure" in ctx.artifact.evidence_policy.screenshot_on:
-            screenshot_path = evidence.save_screenshot(ctx.page, ctx.evidence_dir, step.step_id, "hard_failure")
+            sensitive = redaction.find_sensitive_fields(ctx.page, ctx.artifact.evidence_policy.redact_fields)
+            screenshot_path = evidence.save_screenshot(
+                ctx.page, ctx.evidence_dir, step.step_id, "hard_failure", mask_locators=[f.locator for f in sensitive]
+            )
         result = HardFailureResult(
             step_id=step.step_id,
             expected=step.description,

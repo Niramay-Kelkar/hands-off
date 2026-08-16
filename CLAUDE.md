@@ -232,19 +232,42 @@ brief — a bare/mocked operator UI is fine as long as the handoff mechanism
 and control-transfer model are real and well-reasoned, which they are meant
 to be the focus of, not the UI polish.
 
-## Safety guardrails (Section 3.4 of the brief)
+## Safety guardrails (Section 3.4 of the brief) — built
 
 - Explicit, configurable allowlist of permitted domains/routes and
   permitted action types, enforced at the point of action (in the
-  executor/action functions), not just suggested via prompt.
-- Actions classified safe/reversible vs. risky/irreversible
-  (`risk_class` at the artifact level, potentially finer-grained later).
-  Current stance: risky/irreversible actions are blocked or require
-  explicit human confirmation before executing — conservative by design.
-  Document and defend this choice in REPORT.md.
-- Never persist secrets or raw sensitive data (credentials, tokens, full
-  PII) into artifacts or logs — enforced via `evidence_policy.redact_fields`
-  plus a redaction pass before anything is written to disk.
+  executor/action functions), not just suggested via prompt. See
+  `agent/guardrails.py`.
+- **Risk gating, built (`agent/engine.py`, `run_capability`)**: any
+  capability with `risk_class` other than `read_only`, or
+  `guardrails.requires_confirmation: true`, pauses for explicit human
+  confirmation via the *same* escalation/operator-console path used
+  mid-run — before its first step's action executes, not just described
+  as a stance. Navigation to the entry point happens first, so the
+  operator reviews real page context, not a blank browser.
+  `member_balance_lookup` (`read_only`) is unaffected — the check is
+  skipped entirely, verified with zero behavior change. Proven against a
+  synthetic in-memory `risk_class: "mutating"` fixture: paused at step 0
+  before any action was logged, resumed, then executed and completed.
+  See BUILD_LOG.md for the verification transcript.
+- **Redaction, built and verified against real sensitive data
+  (`agent/redaction.py`)**: `evidence_policy.redact_fields` is enforced
+  by scanning the *live page* for label cells matching a redact_fields
+  entry (same label -> sibling-value convention as extraction) and
+  masking the real value found there — not a guessed pattern. Applied at
+  three points: `agent/perception.py`'s `observe()` masks discovery's
+  full accessibility-tree dump at the source, so both the live model
+  conversation and everything persisted from it are already masked;
+  `agent/evidence.py`'s `StepLogWriter` rescans the page on every
+  `log.jsonl` event as defense-in-depth for any raw text path that
+  doesn't go through `observe()` (e.g. a checkpoint's
+  `field_value_equals` readback); screenshots use Playwright's native
+  `mask=` parameter to black out the sensitive region before the PNG is
+  ever written. `target_app`'s member detail page carries a genuine
+  unmasked account number (never a declared `member_balance_lookup`
+  output) specifically to exercise this against real data — verified
+  the raw value appears in neither the trajectory JSON, `log.jsonl`, nor
+  the screenshot, only `[REDACTED]`. See BUILD_LOG.md.
 
 ## Deliverables — exact required structure, do not deviate
 
