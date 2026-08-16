@@ -1,0 +1,7 @@
+{"ts": "2026-08-16T15:57:11.083844+00:00", "kind": "run_start", "capability_id": "synthetic_mutating_fixture", "version": 1, "params": {}}
+{"ts": "2026-08-16T15:57:12.802900+00:00", "kind": "risk_gate_pause", "risk_class": "mutating", "requires_confirmation": false, "screenshot": "evidence/runs/synthetic_mutating_fixture_20260816T155711Z_18c012/screenshots/step_0_risk_confirmation_required.png"}
+{"ts": "2026-08-16T15:57:43.949208+00:00", "kind": "risk_gate_resumed"}
+{"ts": "2026-08-16T15:57:43.985574+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-16T15:57:44.055554+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-16T15:57:45.091708+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-16T15:57:45.092962+00:00", "kind": "run_end", "status": "success"}

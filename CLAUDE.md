@@ -373,6 +373,32 @@ Two things worth knowing about how the mechanical layer is built:
   Deliberate cut: a css fallback would require re-visiting the live page
   at compile time (DOM re-walk), which this compiler doesn't do. Note
   for REPORT.md's Cuts section.
+- **Extract locators are compiled from the field's label, not its
+  value.** An extract action's locator *is* the literal value it reads
+  (e.g. `role="cell", name="Jane Doe"`) — that's how extraction finds
+  the element. Templatizing that literal into a compiled artifact bakes
+  one specific discovery run's answer into every future replay, both for
+  the extract step itself and for the checkpoint of whatever step
+  precedes it (which was built from "the next action's locator", i.e.
+  the same literal). Found and fixed during evidence curation, when
+  replaying the shipped `member_balance_lookup.compiled.json` against
+  `member_id=10004` failed a checkpoint checking for `"Jane Doe"` — a
+  member other than the one the artifact was discovered against could
+  structurally never pass. Fixed by resolving each extract's associated
+  label (`agent/redaction.py`'s `label_for_value`, the same
+  label-cell/sibling-value convention `find_sensitive_fields` already
+  used, walked in reverse) during discovery, carrying it on
+  `TrajectoryStep.extract_label`, and having the compiler build both the
+  extract locator and the preceding step's checkpoint from that label
+  (`role="cell", name_matches="^<Label>:"`) instead of the value. The
+  model-facing `extract` tool schema is unchanged — the model still
+  points at the value it sees. See BUILD_LOG.md for the full bug chain,
+  including a second dormant bug this surfaced: `schema/example_artifact.json`'s
+  hand-authored extract locators used `role="text"`, which this app's
+  accessibility tree never actually renders (label and value cells are
+  both role `"cell"`) — `agent/actions.py`'s label-detection now keys on
+  the resolved text ending in `:` instead of a role, and the reference
+  schema was corrected to match.
 
 Per-step `escalation_override` is never carried over from the policy
 file's own steps either (steps are 100% mechanical) — a compiled

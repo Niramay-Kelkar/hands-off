@@ -1,0 +1,8 @@
+{"ts": "2026-08-16T15:52:24.475698+00:00", "kind": "run_start", "capability_id": "member_balance_lookup", "version": 1, "params": {"member_id": "99999"}}
+{"ts": "2026-08-16T15:52:25.303390+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-16T15:52:25.368417+00:00", "kind": "action", "type": "type", "value": "99999"}
+{"ts": "2026-08-16T15:52:26.403497+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-16T15:52:26.425672+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-16T15:52:26.527231+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-16T15:52:29.583799+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": "MEMBER_NOT_FOUND", "detail": null}
+{"ts": "2026-08-16T15:52:29.610047+00:00", "kind": "run_end", "status": "business_outcome"}

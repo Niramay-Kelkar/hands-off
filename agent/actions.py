@@ -58,15 +58,18 @@ def _extract(action: ActionModel, resolved: ResolvedLocator | None, ctx: "RunCon
 
 
 def _read_extracted_text(field_locator: ResolvedLocator) -> str:
-    """An accessibility "text" role match here is a label anchor (e.g.
+    """A resolved cell whose own text ends in ':' is a label anchor (e.g.
     "Name:") in this app's label/value table layout — the value lives in
-    the next sibling cell. CSS fallback selectors target the value cell
-    directly, so no sibling hop is needed there."""
-    if field_locator.strategy_kind == "accessibility" and field_locator.role == "text":
+    the next sibling cell. Same signal agent.redaction's label<->value scan
+    uses; label cells carry the same role as value cells here (both
+    "cell"), so role alone can't tell them apart. A locator that resolves
+    directly to a value cell (e.g. a css fallback) returns its own text."""
+    own_text = field_locator.locator.inner_text().strip()
+    if own_text.endswith(":"):
         sibling = field_locator.locator.locator("xpath=following-sibling::*[1]")
         if sibling.count() > 0:
             return sibling.inner_text().strip()
-    return field_locator.locator.inner_text().strip()
+    return own_text
 
 
 def _coerce_output(artifact: Capability, name: str, raw: str) -> object:

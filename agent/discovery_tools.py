@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from playwright.sync_api import Locator, TimeoutError as PWTimeoutError
 
+from agent import redaction
 from agent.context import DiscoveryContext
 from agent.guardrails import GuardrailViolation, check_route
 from agent.registry import Registry
@@ -128,6 +129,7 @@ class ToolOutcome:
     detail: str
     ended: bool = False
     outputs: dict[str, str] | None = None
+    label: str | None = None
 
 
 DiscoveryToolFn = Callable[[dict[str, Any], DiscoveryContext], ToolOutcome]
@@ -221,7 +223,8 @@ def _extract(tool_input: dict[str, Any], ctx: DiscoveryContext) -> ToolOutcome:
         return ToolOutcome(ok=False, detail=err)
     value = locator.inner_text().strip()
     ctx.outputs[output_name] = value
-    return ToolOutcome(ok=True, detail=f"extracted {output_name}={value!r}")
+    label = redaction.label_for_value(locator)
+    return ToolOutcome(ok=True, detail=f"extracted {output_name}={value!r}", label=label)
 
 
 @DISCOVERY_TOOL_REGISTRY.register("done")

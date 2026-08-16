@@ -393,4 +393,103 @@ and confirmed the click then executed and the run completed
 zero pause and zero behavior change, confirming the gate only engages
 where it should.
 
-**Committed:** pending.
+**Committed:** `6e92787` — "Close redaction and risk-gating safety gaps".
+
+---
+
+## 2026-08-16 — Evidence curation surfaces a real compiler bug: mechanical checkpoints/extract locators overfit to the discovery run's literal values
+
+Regenerating evidence for `/evidence/` (discovery run, four replay
+outcomes, redaction, risk gating — see the next entry) required a
+genuine escalation replay against `member_id=10004`. That run is what
+caught this; `10001`/`10002`/`99999` never could have, because `10001`
+is the exact member the shipped compiled artifact was originally
+discovered against, and `10002`/`99999` both resolve through the
+`outcome_match` branch before ever reaching the step whose checkpoint
+was broken. The bug was structural, not incidental — the compiler's
+mechanical layer had one path that happened to only ever get exercised
+by the one member it was compiled from.
+
+**Bug 1 — step 3's checkpoint hardcoded `"Jane Doe"`.**
+`compiler.py`'s `_checkpoint_for` builds a step's checkpoint from *the
+next action's* locator. For the step that clicks into the member detail
+page, the next action in the trajectory is the `extract` call for
+`member_name` — and an extract's locator *is* the literal value it
+reads (that's what makes extraction possible). Templatizing that value
+into the checkpoint baked one specific discovery run's answer
+("Jane Doe") into every future replay, so replaying for `10004`
+("Pat Whitfield") correctly resolved the locator, correctly landed on
+the right page, and then failed its checkpoint anyway — not a false
+negative on a bad element, a checkpoint that could structurally never
+match anyone but member `10001`.
+
+**Bug 2 — the same overfit lived one step deeper, in extraction itself.**
+Fixing bug 1 (checkpoint) exposed that step 4's own extract locators had
+the identical flaw: compiled as `role="cell", name="Jane Doe"` /
+`name="$4521.10"` — literal values, unable to resolve on any other
+member's page by construction. Retrying `10004` after the checkpoint fix
+got further (correctly past step 3) and then hit a clean `hard_failure`
+at extraction — the right *category* of outcome, correctly diagnosed,
+but still not a working capability for any member besides the one it
+was compiled from.
+
+**The real fix: extract locators compiled from the field's *label*, not
+its value.** `agent/redaction.py` already had exactly this pattern for a
+different purpose — `find_sensitive_fields` walks label cell -> sibling
+value cell to redact known-sensitive fields. Added the reverse walk,
+`label_for_value(locator)` (value cell -> preceding-sibling label cell,
+e.g. `"Savings Balance:"`), reusing the same xpath-sibling technique, not
+reimplementing it. Wired discovery's `extract` tool
+(`discovery_tools.py`) to resolve this label alongside the value on every
+extract call and carry it on `TrajectoryStep.extract_label`
+(`trajectory.py`) — the model-facing tool schema is unchanged; it still
+points at the value it sees, exactly as before. The compiler now prefers
+a label-based locator (`_label_locator_for`) for both `member_name` and
+`savings_balance` — this was applied to both fields, not just the one
+that surfaced the bug, since `savings_balance`'s locator had the exact
+same structural flaw and would have failed identically for any member
+whose balance differs from `10001`'s. Step 3's checkpoint is now derived
+from that same label (`next_action.extract_label`) instead of a second,
+separate hand-rolled rule — one source of truth, not two fixes.
+
+**Bug 3, found while implementing bug 2's fix — the label/value split was
+never keyed on a role that actually exists.** The first version of the
+label-locator fix used `role="text"`, matching the convention already
+written by hand in `schema/example_artifact.json`. Replaying against it
+failed immediately, on `10001` — the golden path, not even the escalation
+run. Dumping this app's real `aria_snapshot()` showed why: label cells
+and value cells both render as role `"cell"` — `role="text"` isn't a
+role Playwright's accessibility tree ever assigns here, and never was.
+The hand-authored example was written before `target_app` existed and
+was aspirational, not verified against a live page — and
+`agent/actions.py`'s `_read_extracted_text`, which had a `role == "text"`
+special case for exactly this scenario since the replay-engine phase,
+had never actually been exercised by any prior verified replay (every
+compiled artifact prior to this fix always matched the value directly,
+never through a label). Fixed by dropping the role check entirely:
+`_read_extracted_text` now detects "this resolved to a label" from the
+resolved element's own text ending in `:` — the same signal
+`redaction.py` already keys on — rather than a role that this app never
+renders. `compiler.py`'s `_label_locator_for` and step 3's checkpoint
+both changed from `role="text"` to `role="cell"` to match. Corrected
+`schema/example_artifact.json`'s two extract-field locators the same
+way, in its own separate commit — a hand-authored assumption, disproven
+by live evidence, corrected, not silently folded into the compiler fix.
+That correction only touches the `role` field on those two locators;
+`PolicySpec` (`extra="ignore"`) never parses a policy file's `steps` at
+all, so it has zero effect on the already-compiled
+`member_balance_lookup.compiled.json`.
+
+**Verified**: re-ran discovery for `member_id=10001` (captures
+`extract_label` for both fields), recompiled, and re-ran the full
+matrix — `10001` success, `10002` `ACCESS_DENIED`, `99999`
+`MEMBER_NOT_FOUND`, all clean, no retries. `10004` now escalates on the
+interstitial, pauses, and — after a human dismisses the dialog in the
+*same* live session and resumes via the operator console — completes
+with a genuine `success`: `member_name: "Pat Whitfield"`,
+`savings_balance: 2310.0`. This is the first time this capability has
+round-tripped a member other than the one it was discovered against.
+
+**Committed:** pending (compiler/discovery/actions fix and the
+`schema/example_artifact.json` correction are separate commits — see
+git log).

@@ -1,0 +1,9 @@
+{"ts": "2026-08-16T15:52:17.727787+00:00", "kind": "run_start", "capability_id": "member_balance_lookup", "version": 1, "params": {"member_id": "10002"}}
+{"ts": "2026-08-16T15:52:18.618042+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-16T15:52:18.667991+00:00", "kind": "action", "type": "type", "value": "10002"}
+{"ts": "2026-08-16T15:52:19.704676+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-16T15:52:19.733235+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-16T15:52:19.825453+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-16T15:52:23.857375+00:00", "kind": "scope_region_not_found", "scope": "results_region"}
+{"ts": "2026-08-16T15:52:23.888051+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": "ACCESS_DENIED", "detail": null}
+{"ts": "2026-08-16T15:52:23.913429+00:00", "kind": "run_end", "status": "business_outcome"}

@@ -146,6 +146,7 @@ def run_discovery(
                         model_text=model_text,
                         tool_call={"name": tool_use.name, "input": tool_use.input},
                         tool_result={"ok": outcome.ok, "detail": outcome.detail},
+                        extract_label=outcome.label,
                     )
                 )
                 if out_path is not None:

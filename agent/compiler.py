@@ -142,8 +142,20 @@ def _checkpoint_for(
             "visibility on — not yet supported by the compiler"
         )
     role = inp["role"]
-    name = templatize(inp["name"], params)
-    element_check = ConditionSpec(type="element_visible", role=role, name=name)
+    if next_action.tool_call["name"] == "extract":
+        # extract's locator name is the exact value it reads off the page (e.g. a
+        # member's name) — that's discovery-run-specific data, not a stable landmark,
+        # so templatizing it would bake this one trajectory's literal output into
+        # every future replay's checkpoint. The extract step's own label (e.g.
+        # "Name:") is stable across every member, so check that instead — the
+        # same signal _build_extract_step below compiles the extract locator from.
+        if next_action.extract_label:
+            element_check = ConditionSpec(type="element_visible", role="cell", name=next_action.extract_label)
+        else:
+            element_check = ConditionSpec(type="element_visible", role=role, name=None)
+    else:
+        name = templatize(inp["name"], params)
+        element_check = ConditionSpec(type="element_visible", role=role, name=name)
 
     if not outcome_codes:
         return element_check
@@ -163,6 +175,20 @@ def _locator_for(role: str, name: str) -> LocatorSpec:
         strategies=[
             LocatorStrategyModel(kind="accessibility", priority=1, role=role, name=name),
             LocatorStrategyModel(kind="text_label", priority=2, label=name),
+        ]
+    )
+
+
+def _label_locator_for(label: str) -> LocatorSpec:
+    # Label cells carry the same role ("cell") as value cells in this app's
+    # markup — there's no distinct ARIA role to key on, so agent.actions'
+    # _read_extracted_text detects "this resolved to a label, not a value" from
+    # the resolved element's own text ending in ':' at replay time, not from role.
+    # No text_label fallback here — get_by_label only resolves form-control
+    # labels, which these table cells aren't.
+    return LocatorSpec(
+        strategies=[
+            LocatorStrategyModel(kind="accessibility", priority=1, role="cell", name_matches="^" + re.escape(label)),
         ]
     )
 
@@ -203,9 +229,13 @@ def _build_extract_step(
     fields = []
     for a in extract_actions:
         inp = a.tool_call["input"]
-        role = inp["role"]
-        target_name = templatize(inp["name"], params)
-        fields.append(ExtractField(output=inp["output_name"], locator=_locator_for(role, target_name)))
+        if a.extract_label:
+            locator = _label_locator_for(a.extract_label)
+        else:
+            role = inp["role"]
+            target_name = templatize(inp["name"], params)
+            locator = _locator_for(role, target_name)
+        fields.append(ExtractField(output=inp["output_name"], locator=locator))
 
     return Step(
         step_id=step_id,

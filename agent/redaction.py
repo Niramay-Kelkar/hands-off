@@ -55,6 +55,22 @@ def find_sensitive_fields(page: Page, redact_fields: list[str]) -> list[Sensitiv
     return found
 
 
+def label_for_value(value_locator: Locator) -> str | None:
+    """Given a resolved value-cell Locator (e.g. from a discovery extract
+    call), finds its associated label by walking to the preceding sibling
+    cell -- the same label-cell <-> sibling-value convention as
+    find_sensitive_fields, just walked in reverse. Returns the raw label
+    text including its trailing ':' (e.g. "Savings Balance:"), or None if
+    there's no adjacent label cell."""
+    label = value_locator.locator("xpath=preceding-sibling::*[1]")
+    if label.count() == 0:
+        return None
+    text = label.inner_text().strip()
+    if not text.endswith(":"):
+        return None
+    return text
+
+
 def mask_text(text: str, fields: list[SensitiveField]) -> str:
     for field in fields:
         if field.value:

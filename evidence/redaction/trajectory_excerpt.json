@@ -1,0 +1,24 @@
+{
+  "step_index": 4,
+  "tool_call": {
+    "name": "extract",
+    "input": {
+      "role": "cell",
+      "name": "Jane Doe",
+      "output_name": "member_name"
+    }
+  },
+  "observation_excerpt": [
+    "    - 'row \"Branch Notices Member Detail Name: Jane Doe Savings Balance: $4521.10 Account Number: [REDACTED]\"':",
+    "      - 'cell \"Member Detail Name: Jane Doe Savings Balance: $4521.10 Account Number: [REDACTED]\"':",
+    "            - 'row \"Member Detail Name: Jane Doe Savings Balance: $4521.10 Account Number: [REDACTED]\"':",
+    "              - 'cell \"Member Detail Name: Jane Doe Savings Balance: $4521.10 Account Number: [REDACTED]\"':",
+    "                    - 'row \"Name: Jane Doe\"':",
+    "                      - cell \"Name:\"",
+    "                    - 'row \"Savings Balance: $4521.10\"':",
+    "                      - cell \"Savings Balance:\"",
+    "                    - 'row \"Account Number: [REDACTED]\"':",
+    "                      - cell \"Account Number:\"",
+    "                      - cell \"[REDACTED]\""
+  ]
+}
