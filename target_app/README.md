@@ -77,6 +77,27 @@ map to the artifact's recoverable/escalation conditions, not to
 | `10004` | Not in DB — app-layer only, fixture data in `server.py` | Search results show a fabricated row; clicking into detail renders an unexpected in-page modal (`role="dialog"`, aria-label "Notice") that must be dismissed before the underlying content is usable | recoverable/escalation trigger — lines up with the existing `escalation_override.on_unrecognized_dialog` on step 3 of `schema/example_artifact.json` |
 | any other well-formed 5-digit ID (e.g. `99999`) | Genuine `SELECT` returns zero rows | Results region shows "No records found" | `MEMBER_NOT_FOUND` business outcome (detection scope: `results_region`) |
 
+## `detection.scope` is a contract with this app's `aria-label` regions
+
+The replay engine's `text_present` checkpoint resolves `expected_outcomes[].detection.scope`
+generically, not via any target-app-specific selector list:
+
+- `scope: "page"` searches the main document's text only (`page.locator("body").inner_text()`).
+  Iframe content is never included — the branch-notice `<iframe>` renders a
+  separate document, so its text is structurally absent from the parent
+  document's DOM regardless of scope, not filtered out after the fact.
+- any other `scope` value is looked up as `role="region"` + `aria-label="<scope>"`
+  on the current page, e.g. `scope: "results_region"` matches the
+  `<div class="resultsRegion" role="region" aria-label="results_region">`
+  wrapper on the search page. If no such region is found, the engine falls
+  back to a whole-page search and logs a warning — so a scope name must
+  match a real `aria-label` here for detection to be scoped correctly.
+
+This means adding a new expected-outcome scope to an artifact requires a
+matching `role="region" aria-label="<scope>"` element somewhere on this
+app's pages — same spirit as the rest of the app: still no test IDs, but
+the accessibility tree is asked to carry real structure.
+
 ## Routes
 
 | Route | Purpose |

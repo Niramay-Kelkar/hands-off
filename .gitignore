@@ -23,6 +23,10 @@ test-results/
 evidence/*.png
 evidence/*.mp4
 evidence/raw/
+# every replay/discovery run writes here (agent/evidence.py, agent/escalation.py) —
+# curated examples for the deliverable get copied out and force-added, not this wholesale
+evidence/runs/
+evidence/sessions/
 
 # OS / editor
 .DS_Store

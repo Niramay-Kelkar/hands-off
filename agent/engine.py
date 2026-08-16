@@ -1,0 +1,238 @@
+"""The replay engine: given a Capability artifact and input params,
+executes its steps against the live UI with no LLM in the loop, and
+resolves to exactly one of the three ReplayResult shapes (see
+agent.models) — business outcomes and hard failures must never be
+conflated. A recoverable condition that resolves via retry never shows
+up in the return value at all, only in the structured log.
+
+Each step is split into two phases with separate retry handling:
+
+- ACT (resolve the step's locator, perform the action) — retrying this
+  phase means redoing the action, which is only safe because nothing
+  has happened yet if this phase itself failed.
+- CHECK (unexpected-dialog interrupt, then checkpoint evaluation) —
+  retrying this phase means re-checking current page state, never
+  re-running the action. This matters for two reasons: an automatic
+  retry must not double-click a button that already registered, and a
+  human who resumes an escalated run has typically just fixed the page
+  in place (e.g. dismissed a dialog) — re-evaluating what's on screen
+  now is correct, blindly repeating the original click is not.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Callable
+
+from playwright.sync_api import TimeoutError as PWTimeoutError
+from playwright.sync_api import sync_playwright
+
+from agent import escalation, evidence, guardrails
+from agent.actions import ACTION_REGISTRY
+from agent.checkpoints import evaluate_checkpoint
+from agent.context import RunContext
+from agent.evidence import StepLogWriter
+from agent.locators import LocatorResolutionError, ResolvedLocator, resolve_locator
+from agent.models import (
+    BusinessOutcomeResult,
+    Capability,
+    HardFailureResult,
+    ReplayResult,
+    Step,
+    SuccessResult,
+)
+
+
+class InputValidationError(ValueError):
+    pass
+
+
+def validate_inputs(artifact: Capability, raw_params: dict[str, str]) -> dict[str, str]:
+    """Checked before the browser is even launched."""
+    errors: list[str] = []
+    result: dict[str, str] = {}
+    for spec in artifact.inputs:
+        value = raw_params.get(spec.name)
+        if value is None:
+            if spec.required:
+                errors.append(f"missing required input {spec.name!r}")
+            continue
+        if spec.pattern and not re.fullmatch(spec.pattern, value):
+            errors.append(f"input {spec.name!r}={value!r} does not match pattern {spec.pattern!r}")
+        result[spec.name] = value
+
+    unknown = set(raw_params) - {spec.name for spec in artifact.inputs}
+    if unknown:
+        errors.append(f"unknown input(s): {sorted(unknown)}")
+
+    if errors:
+        raise InputValidationError("; ".join(errors))
+    return result
+
+
+def run_capability(artifact: Capability, raw_params: dict[str, str], *, headed: bool = True) -> ReplayResult:
+    params = validate_inputs(artifact, raw_params)
+
+    run_id = evidence.new_run_id(artifact.capability_id)
+    rdir = evidence.run_dir(run_id)
+    log = StepLogWriter(rdir / "log.jsonl", artifact.evidence_policy.redact_fields)
+    log.event("run_start", capability_id=artifact.capability_id, version=artifact.version, params=params)
+    escalation.open_session(run_id, artifact.capability_id)
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=not headed)
+        page = browser.new_page()
+        ctx = RunContext(page=page, artifact=artifact, params=params, run_id=run_id, evidence_dir=rdir, log=log)
+
+        try:
+            try:
+                page.goto(artifact.target.entry_point)
+                guardrails.check_route(page.url, artifact)
+            except Exception as exc:
+                log.event("entry_navigation_failed", detail=str(exc)[:300])
+                screenshot_path = None
+                if "hard_failure" in artifact.evidence_policy.screenshot_on:
+                    screenshot_path = evidence.save_screenshot(page, rdir, 0, "hard_failure")
+                result = HardFailureResult(
+                    step_id=0,
+                    expected=f"navigate to entry_point {artifact.target.entry_point!r}",
+                    observed=str(exc)[:300],
+                    screenshot_path=screenshot_path,
+                )
+                log.event("run_end", status=result.status)
+                escalation.complete_session(run_id, result.status)
+                return result
+
+            for step in artifact.steps:
+                result = _execute_step(step, ctx)
+                if result is not None:
+                    log.event("run_end", status=result.status)
+                    escalation.complete_session(run_id, result.status)
+                    return result
+
+            outputs = {o.name: ctx.outputs.get(o.name) for o in artifact.outputs}
+            result = SuccessResult(outputs=outputs)
+            log.event("run_end", status=result.status)
+            escalation.complete_session(run_id, result.status)
+            return result
+        finally:
+            browser.close()
+
+
+def _execute_step(step: Step, ctx: RunContext) -> ReplayResult | None:
+    """Returns a terminal ReplayResult, or None to continue to the next step."""
+    overrides = step.escalation_override or {}
+
+    ok, resolved, terminal = _run_with_escalation(step, ctx, overrides, lambda: _act_once(step, ctx))
+    if not ok:
+        return terminal
+
+    ok, check_outcome, terminal = _run_with_escalation(step, ctx, overrides, lambda: _check_once(step, ctx, resolved))
+    if not ok:
+        return terminal
+    return check_outcome  # None (continue) or BusinessOutcomeResult
+
+
+def _run_with_escalation(
+    step: Step, ctx: RunContext, overrides: dict, attempt_fn: Callable[[], tuple]
+) -> tuple[bool, object, ReplayResult | None]:
+    """Calls attempt_fn() repeatedly per the step's escalation policy.
+    attempt_fn() returns ("ok", value) or ("failure", trigger, detail).
+    On escalation, attempt_fn() is called again after resume — for the
+    CHECK phase that's a re-check of current state, for the ACT phase
+    that's a redo, since ACT hasn't succeeded yet if it's retrying at all."""
+    attempt = 0
+    while True:
+        outcome = attempt_fn()
+        if outcome[0] == "ok":
+            return True, outcome[1], None
+
+        _, trigger, detail = outcome
+        rule = overrides.get(trigger) or ctx.artifact.escalation_policy.default.get(trigger)
+        attempt += 1
+        if attempt <= rule.retry:
+            ctx.log.event("retry", step_id=step.step_id, trigger=trigger, attempt=attempt, detail=detail)
+            continue
+
+        if rule.then == "escalate":
+            screenshot_path = evidence.save_screenshot(ctx.page, ctx.evidence_dir, step.step_id, trigger)
+            ctx.log.event(
+                "escalate", step_id=step.step_id, trigger=trigger, detail=detail, screenshot=screenshot_path
+            )
+            escalation.pause_for_escalation(ctx.run_id, step.step_id, trigger, screenshot_path)
+            ctx.log.event("escalation_resumed", step_id=step.step_id)
+            attempt = 0  # resumed run gets a fresh retry budget for this phase
+            continue
+
+        screenshot_path = None
+        if "hard_failure" in ctx.artifact.evidence_policy.screenshot_on:
+            screenshot_path = evidence.save_screenshot(ctx.page, ctx.evidence_dir, step.step_id, "hard_failure")
+        result = HardFailureResult(
+            step_id=step.step_id,
+            expected=step.description,
+            observed=detail or trigger,
+            screenshot_path=screenshot_path,
+        )
+        return False, None, result
+
+
+def _act_once(step: Step, ctx: RunContext) -> tuple:
+    try:
+        resolved: ResolvedLocator | None = None
+        if step.locator is not None:
+            resolved = resolve_locator(step.locator.strategies, ctx)
+
+        guardrails.check_action_type(step.action, ctx.artifact)
+        before_url = ctx.page.url
+        ACTION_REGISTRY.get(step.action.type)(step.action, resolved, ctx)
+        if ctx.page.url != before_url:
+            guardrails.check_route(ctx.page.url, ctx.artifact)
+
+        if step.wait is not None and step.wait.type == "network_idle":
+            ctx.page.wait_for_load_state("networkidle", timeout=step.wait.timeout_ms)
+
+        return ("ok", resolved)
+    except PWTimeoutError as exc:
+        return ("failure", "on_step_timeout", str(exc)[:300])
+    except (LocatorResolutionError, guardrails.GuardrailViolation) as exc:
+        return ("failure", "on_hard_failure", str(exc)[:300])
+    except Exception as exc:  # genuinely unexpected — hard failure trigger
+        return ("failure", "on_hard_failure", f"{type(exc).__name__}: {exc}"[:300])
+
+
+def _check_once(step: Step, ctx: RunContext, resolved: ResolvedLocator | None) -> tuple:
+    try:
+        # Proactive interrupt: an unexpected dialog is itself the anomaly,
+        # even if the page underneath happens to still satisfy the literal
+        # checkpoint query (a modal overlay doesn't reliably fail a plain
+        # visibility check) — checked before, not derived from, checkpoint
+        # failure.
+        if _has_unexpected_dialog(ctx):
+            ctx.log.event("unrecognized_dialog", step_id=step.step_id)
+            return ("failure", "on_unrecognized_dialog", "unexpected dialog visible")
+
+        checkpoint_timeout = step.wait.timeout_ms if (step.wait and step.wait.type == "visible") else 2000
+        check = evaluate_checkpoint(step.checkpoint, ctx, resolved, timeout_ms=checkpoint_timeout)
+        ctx.log.event(
+            "checkpoint", step_id=step.step_id, matched=check.matched, outcome_code=check.outcome_code, detail=check.detail
+        )
+
+        if check.matched and check.outcome_code:
+            return ("ok", BusinessOutcomeResult(outcome_code=check.outcome_code, step_id=step.step_id))
+        if check.matched:
+            return ("ok", None)
+        return ("failure", "on_checkpoint_failure", check.detail)
+    except PWTimeoutError as exc:
+        return ("failure", "on_step_timeout", str(exc)[:300])
+    except Exception as exc:
+        return ("failure", "on_hard_failure", f"{type(exc).__name__}: {exc}"[:300])
+
+
+def _has_unexpected_dialog(ctx: RunContext) -> bool:
+    for role in ("dialog", "alertdialog"):
+        try:
+            ctx.page.get_by_role(role).first.wait_for(state="visible", timeout=500)
+            return True
+        except PWTimeoutError:
+            continue
+    return False

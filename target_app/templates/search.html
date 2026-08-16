@@ -23,11 +23,11 @@
       {% if outcome == 'access_denied' %}
         <div class="pageBanner" role="alert">You do not have permission to view this member.</div>
       {% elif outcome == 'not_found' %}
-        <div class="resultsRegion">
+        <div class="resultsRegion" role="region" aria-label="results_region">
           <p class="noRes">No records found</p>
         </div>
       {% elif result %}
-        <div class="resultsRegion">
+        <div class="resultsRegion" role="region" aria-label="results_region">
           <table class="results" aria-label="Search results" cellpadding="0" cellspacing="0" border="0">
             <tbody>
               <tr>

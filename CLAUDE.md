@@ -163,6 +163,68 @@ this only matters to replay running unattended in production. Reasonable
 defaults apply automatically; authors only add `escalation_override` when
 a specific step's risk profile genuinely differs from the default.
 
+## Replay engine — built (agent/)
+
+Implements the build order's step 3, before any agent/discovery code.
+Module layout: `models.py` (Pydantic artifact + ReplayResult union),
+`registry.py` (generic `Registry[F]`), `locators.py` / `checkpoints.py` /
+`actions.py` (one `Registry` instance each, per the Perception section
+above), `guardrails.py`, `escalation.py`, `operator_console.py`,
+`evidence.py`, `context.py` (`RunContext` threaded through everything),
+`engine.py` (`run_capability` orchestration), `replay.py` (CLI). Run:
+`python -m agent.replay --capability <path> --input k=v [...]`.
+
+Real implementation decisions made while building this (the schema left
+these open on purpose — see "Open / not yet decided" below, now trimmed):
+
+- **`text_present` scope resolution**: `scope: "page"` searches
+  `page.locator("body").inner_text()` — main frame only; iframe content
+  is never included because an iframe renders a separate document, not
+  because anything filters it out. Any other scope value is looked up as
+  `role="region"` + matching `aria-label` on the current page, falling
+  back to whole-page search (with a logged warning) if not found. This
+  makes `detection.scope` a contract with the target app's `aria-label`
+  regions — target_app/README.md documents it from the app side.
+- **Unrecognized-dialog detection is a proactive interrupt, not a
+  fallback explanation for checkpoint failure.** It's checked
+  (`role="dialog"` / `role="alertdialog"` visible) immediately after a
+  step's action, *before* checkpoint evaluation — because a modal
+  overlay doesn't reliably fail a plain Playwright visibility check, so
+  a checkpoint can pass right through a dialog it should have caught.
+- **Each step splits into an ACT phase (resolve locator + perform the
+  action) and a CHECK phase (dialog interrupt + checkpoint eval), each
+  with its own retry/escalate handling.** Both automatic retries and a
+  human's "resume" only ever redo the CHECK phase, never re-run the
+  action. This matters twice over: an automatic retry must not
+  double-click a button that already registered, and a human who
+  resumes an escalated run has typically just fixed the live page in
+  place (e.g. dismissed a dialog) — re-evaluating what's on screen now
+  is correct, blindly repeating the original click is not. Verified by
+  driving a run to a paused interstitial, attaching to the *same* live
+  browser over CDP to dismiss the dialog exactly as a human physically
+  would, and confirming the resumed run re-checks rather than re-clicks.
+- **Extraction for an accessibility `role: "text"` match reads the next
+  DOM sibling cell**, not the matched node's own text — the match is a
+  label anchor (e.g. "Name:") in this app's label/value table layout,
+  the value lives in the following `<td>`. CSS fallback selectors target
+  the value cell directly, so no sibling hop is needed there.
+- **`money`-typed outputs get `$`/comma-stripped and parsed to `float`**
+  during extraction; other output types pass through as extracted text.
+- **Initial navigation to `target.entry_point` is wrapped the same as
+  any step** — a failed navigation produces a `HardFailureResult`
+  (`step_id: 0`), not an uncaught exception, so the "always exactly one
+  of three shapes" contract holds even before step 1 runs.
+
+Cut, for REPORT.md: one process owns the Playwright browser end to end,
+headed, no RPC. Escalation is a shared SQLite `runs` table
+(`evidence/sessions/sessions.db`) — the replay process writes its paused
+state and blocks polling it; `operator_console.py` is a separate,
+minimal Flask process (status + screenshot + one Resume button) reading
+the same table. If the replay process dies while paused, the browser
+goes with it; a production version would separate the browser process
+from the replay/orchestration process so a paused session survives an
+orchestrator restart.
+
 ## The result-outcome taxonomy (applies to the replay engine's return type)
 
 Every replay run must resolve to exactly one of three categories. Getting
@@ -246,7 +308,7 @@ infrastructure) — but the seam and reasoning must be real.
    DONE, see schema/example_artifact.json.
 3. Build the replay engine before the agent loop — it defines what a "step"
    and "action" vocabulary means; the agent just needs to emit into that
-   vocabulary.
+   vocabulary. DONE, see "Replay engine — built (agent/)" above.
 4. Build the discovery agent loop (tool-use style: observe/click/type/
    navigate/extract, each action gated through the guardrail check).
 5. Build the artifact compiler — turns a successful discovery trajectory
@@ -258,9 +320,6 @@ infrastructure) — but the seam and reasoning must be real.
 ## Open / not yet decided
 
 - Exact LLM provider/model for the discovery loop.
-- Exact detection implementation details for `checkpoint` and
-  `expected_outcomes.detection` types (the schema defines the vocabulary;
-  the executor needs to implement each `type` value as real logic).
 - Whether to pursue any stretch goal, and which one (pick at most one —
   agent-facing capability catalog and cross-tenant reuse are the two most
   aligned with the brief's core thesis).
