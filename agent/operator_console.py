@@ -13,6 +13,7 @@ Run: python -m agent.operator_console  (serves http://localhost:8100)
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from flask import Flask, abort, redirect, render_template_string, send_file, url_for
@@ -71,4 +72,6 @@ def resume(run_id: str):
 
 
 if __name__ == "__main__":
-    app.run(port=8100, debug=True)
+    # FLASK_RUN_HOST defaults to loopback-only; docker-compose.yml sets it
+    # to 0.0.0.0 so the container's published port is actually reachable.
+    app.run(host=os.environ.get("FLASK_RUN_HOST", "127.0.0.1"), port=8100, debug=True)

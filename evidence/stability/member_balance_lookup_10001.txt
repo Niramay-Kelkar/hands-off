@@ -1,0 +1,16 @@
+$ python -m agent.replay --capability schema/capabilities/member_balance_lookup.compiled.json --input member_id=10001 --headless --repeat 8
+
+run 1/8: status=success duration=6.65s
+run 2/8: status=success duration=5.54s
+run 3/8: status=success duration=5.54s
+run 4/8: status=success duration=5.65s
+run 5/8: status=success duration=5.65s
+run 6/8: status=success duration=5.66s
+run 7/8: status=success duration=5.62s
+run 8/8: status=success duration=5.72s
+
+--- stability summary (8 runs, member_balance_lookup, {'member_id': '10001'}) ---
+success (non-hard-failure): 8/8
+by status:
+  success: 8
+duration: min=5.54s max=6.65s avg=5.75s

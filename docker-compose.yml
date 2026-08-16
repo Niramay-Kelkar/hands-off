@@ -1,0 +1,30 @@
+# Brings up the two genuinely browser-free services: target_app and
+# operator_console. discover.py, replay.py, and capability_api.py all
+# drive a headed Playwright browser and stay on the host, pointed at
+# these containers (see README.md's "Quick start via Docker" section
+# and CLAUDE.md).
+#
+# Both services bind-mount the repo root at /app so relative paths
+# (target_app/members.db, evidence/sessions/sessions.db, screenshot
+# paths written into it) resolve identically whether a process is
+# running on the host or in a container.
+services:
+  target_app:
+    build: .
+    command: python -m target_app.server
+    environment:
+      - FLASK_RUN_HOST=0.0.0.0
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+
+  operator_console:
+    build: .
+    command: python -m agent.operator_console
+    environment:
+      - FLASK_RUN_HOST=0.0.0.0
+    ports:
+      - "8100:8100"
+    volumes:
+      - .:/app

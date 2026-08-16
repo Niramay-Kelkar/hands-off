@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.pytest_cache/
+node_modules/
+playwright-report/
+test-results/
+evidence/runs/
+evidence/sessions/
+evidence/*.png
+evidence/*.mp4

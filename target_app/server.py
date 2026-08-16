@@ -20,6 +20,7 @@ separate on purpose (see target_app/README.md):
 Run: python -m target_app.server  (serves http://localhost:8000)
 """
 
+import os
 import time
 
 from flask import Flask, abort, render_template, request, url_for
@@ -106,4 +107,6 @@ def branch_notice():
 
 
 if __name__ == "__main__":
-    app.run(port=8000, debug=True)
+    # FLASK_RUN_HOST defaults to loopback-only; docker-compose.yml sets it
+    # to 0.0.0.0 so the container's published port is actually reachable.
+    app.run(host=os.environ.get("FLASK_RUN_HOST", "127.0.0.1"), port=8000, debug=True)

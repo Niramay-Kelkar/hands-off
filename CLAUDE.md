@@ -194,6 +194,18 @@ orchestrator restart.
 See BUILD_LOG.md for build history: what was verified against which
 seeded target_app cases, bugs found, and how they were fixed.
 
+`replay.py --repeat N` (default 1, current single-result behavior
+unchanged) reruns the same capability + params N times in a row and
+prints a stability summary — counts by `status`, counts by
+`outcome_code`, and min/max/avg duration — instead of a single JSON
+result. Each iteration is a fully independent `run_capability()` call
+(fresh browser, no shared state between runs). This exists to
+demonstrate, not just assert, the brief's own claim that
+record-once/replay-many is only viable because the target UI is stable
+across runs. See `evidence/stability/member_balance_lookup_10001.txt`
+(8/8 success, durations 5.54s–6.65s) and BUILD_LOG.md 2026-08-16
+("--repeat stability flag").
+
 ## The result-outcome taxonomy (applies to the replay engine's return type)
 
 Every replay run must resolve to exactly one of three categories. Getting
@@ -361,44 +373,32 @@ Two things worth knowing about how the mechanical layer is built:
 - **Checkpoints reference policy's `expected_outcomes`, even though
   they're mechanically derived.** Every non-final step's checkpoint is
   `any_of: [element_visible(next successful action's locator),
-  outcome_match(<all policy-declared outcome codes>)]` — found necessary
-  when the first compiled artifact hung forever replaying `10002`/`99999`,
-  because a plain `element_visible` checkpoint has no way to recognize a
-  business outcome as anything but a failure. Referencing codes policy
-  already declares isn't guessing; leaving them unreferenced just meant
-  the two layers were merged into one file without actually being wired
-  together. See BUILD_LOG.md.
+  outcome_match(<all policy-declared outcome codes>)]` — this is what
+  actually wires the mechanical and policy layers together, rather than
+  merging them into one file that never cross-references. See
+  BUILD_LOG.md 2026-08-16 ("Artifact compiler build") for why a plain
+  `element_visible` checkpoint doesn't work here.
 - **No `css` locator strategy is ever synthesized** — only
   `accessibility` + `text_label`, exactly what discovery verified.
   Deliberate cut: a css fallback would require re-visiting the live page
   at compile time (DOM re-walk), which this compiler doesn't do. Note
   for REPORT.md's Cuts section.
-- **Extract locators are compiled from the field's label, not its
-  value.** An extract action's locator *is* the literal value it reads
-  (e.g. `role="cell", name="Jane Doe"`) — that's how extraction finds
-  the element. Templatizing that literal into a compiled artifact bakes
-  one specific discovery run's answer into every future replay, both for
-  the extract step itself and for the checkpoint of whatever step
-  precedes it (which was built from "the next action's locator", i.e.
-  the same literal). Found and fixed during evidence curation, when
-  replaying the shipped `member_balance_lookup.compiled.json` against
-  `member_id=10004` failed a checkpoint checking for `"Jane Doe"` — a
-  member other than the one the artifact was discovered against could
-  structurally never pass. Fixed by resolving each extract's associated
-  label (`agent/redaction.py`'s `label_for_value`, the same
-  label-cell/sibling-value convention `find_sensitive_fields` already
-  used, walked in reverse) during discovery, carrying it on
-  `TrajectoryStep.extract_label`, and having the compiler build both the
-  extract locator and the preceding step's checkpoint from that label
-  (`role="cell", name_matches="^<Label>:"`) instead of the value. The
-  model-facing `extract` tool schema is unchanged — the model still
-  points at the value it sees. See BUILD_LOG.md for the full bug chain,
-  including a second dormant bug this surfaced: `schema/example_artifact.json`'s
-  hand-authored extract locators used `role="text"`, which this app's
-  accessibility tree never actually renders (label and value cells are
-  both role `"cell"`) — `agent/actions.py`'s label-detection now keys on
-  the resolved text ending in `:` instead of a role, and the reference
-  schema was corrected to match.
+- **Extract locators, and the checkpoint of the step before them, are
+  compiled from the field's label, not its literal value** — e.g.
+  `role="cell", name_matches="^Savings Balance:"` rather than
+  `name="$4521.10"` — so a compiled capability replays correctly against
+  any member, not just the one it was discovered against. The label is
+  resolved during discovery (`agent/redaction.py`'s `label_for_value`,
+  the same label-cell/sibling-value convention `find_sensitive_fields`
+  uses for redaction, walked in reverse) and carried on
+  `TrajectoryStep.extract_label`; the model-facing `extract` tool schema
+  is unchanged — the model still points at the value it sees. See
+  BUILD_LOG.md 2026-08-16 ("Evidence curation surfaces a real compiler
+  bug") for the three-bug chain (literal-value overfitting, then a
+  second copy of the same flaw in extraction itself, then a `role="text"`
+  role that this app's accessibility tree never actually renders) that
+  led here, including the resulting correction to
+  `schema/example_artifact.json`'s own extract locators.
 
 Per-step `escalation_override` is never carried over from the policy
 file's own steps either (steps are 100% mechanical) — a compiled
@@ -421,14 +421,65 @@ object, calls `engine.run_capability()` unchanged, and returns the exact
 bad input / unknown capability.
 
 **Demonstration-scale only, deliberately**: no auth, no queueing, one
-synchronous headed-browser run per invoke, no rate limiting. The brief
+synchronous browser run per invoke, no rate limiting. The brief
 explicitly doesn't reward prematurely-built scaling infrastructure —
 restate this in REPORT.md's Cuts section if asked why there's no queue
 or worker pool here.
 
+**`CAPABILITY_API_HEADED`** (env var, default `"true"`) controls whether
+that run is headed or headless, read explicitly rather than relying on
+`run_capability`'s own `headed=True` default. This is deliberately
+exposed as a seam: a production deployment would flip it to headless
+once real remote-operator access exists — the same CDP-attach mechanism
+already validated end-to-end during the `10004` escalation testing (a
+second process attaching to the *same* live browser over the Chrome
+DevTools Protocol), not a human walking up to a local window. Headed
+stays the default here because for this demo, a human on this machine
+watching or intervening in an invoke IS the operator story. See
+BUILD_LOG.md 2026-08-16 ("Containerize target_app + operator_console")
+for why this surfaced: `capability_api` looks browser-free at the
+module level (Flask, no Playwright import) but isn't — `run_capability()`
+underneath it launches a real Chromium, which is also why
+`capability_api` is NOT in `docker-compose.yml` alongside `target_app`
+and `operator_console` (see Containerization below).
+
 `schema/capabilities/` is now the conventional home for compiled
 artifacts meant to be served/invoked — `agent/compile.py --out` should
 target it going forward.
+
+## Containerization — built (target_app + operator_console only)
+
+`Dockerfile` + `docker-compose.yml` (repo root) bring up `target_app`
+and `agent.operator_console` as containers — the two genuinely
+browser-free Flask services. `agent.discover`, `agent.replay`, and
+`agent.capability_api` all drive a real, visible Playwright browser via
+`agent.engine.run_capability()`; containerizing a headed browser needs
+X11/VNC forwarding inside the container, which isn't worth the
+complexity here (note for REPORT.md's Cuts section) — those three stay
+on the host (venv setup, per README.md), pointed at the containerized
+services over `localhost`.
+
+Both services bind-mount the repo root at `/app` rather than baking
+source into the image, so relative paths — `target_app/members.db`,
+`evidence/sessions/sessions.db`, and the screenshot paths written into
+it — resolve identically whether a process is running on the host or
+in a container. This is what lets a containerized `operator_console`
+correctly read and serve the screenshot for a run that `agent.replay`
+paused *from the host*, with no path translation layer. Verified
+directly: ran `agent.replay` on the host against the containerized
+`target_app` (headless, `member_id=10001`, success with correct
+outputs), and confirmed the containerized `operator_console` correctly
+displayed and served the screenshot for an (unrelated, pre-existing)
+paused run written by a host process into the shared `sessions.db`.
+
+Flask's `app.run()` defaults to binding loopback-only, which would make
+a container's published port unreachable from the host. Both
+`target_app/server.py` and `agent/operator_console.py` now read their
+bind host from `FLASK_RUN_HOST` (default `127.0.0.1` — unchanged for
+direct host use), which `docker-compose.yml` sets to `0.0.0.0` for both
+services. See BUILD_LOG.md 2026-08-16 ("Containerize target_app +
+operator_console") for the verification transcript, including why
+`capability_api` was deliberately left out.
 
 ## Open / not yet decided
 

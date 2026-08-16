@@ -490,6 +490,123 @@ with a genuine `success`: `member_name: "Pat Whitfield"`,
 `savings_balance: 2310.0`. This is the first time this capability has
 round-tripped a member other than the one it was discovered against.
 
-**Committed:** pending (compiler/discovery/actions fix and the
-`schema/example_artifact.json` correction are separate commits — see
-git log).
+**Committed:** `8c78221` "Fix compiler overfitting extract locators and
+checkpoints to discovery's literal values".
+
+---
+
+## 2026-08-16 — Containerize target_app + operator_console (Docker)
+
+**Built:** `Dockerfile` (single image, `python:3.11-slim` + `pip install
+-r requirements.txt`, no source baked in) and `docker-compose.yml`
+(repo root), bringing up `target_app` and `agent.operator_console` as
+containers. Both bind-mount the repo root at `/app` instead of `COPY`ing
+source, so they always run whatever's on disk and share
+`target_app/members.db` / `evidence/sessions/sessions.db` with
+host-run processes via identical relative paths — no path translation.
+Also added `.dockerignore` (venv/, .git/, __pycache__/, evidence
+runs/sessions/media) to keep the build context small.
+
+`agent.discover`, `agent.replay`, and `agent.capability_api` were
+deliberately left out — all three drive a real Playwright browser via
+`agent.engine.run_capability()`, and containerizing a headed browser
+needs X11/VNC forwarding, ruled out as not worth the complexity for
+this project up front (see CLAUDE.md).
+
+**Bug caught before it shipped: `capability_api` isn't actually
+browser-free.** Initially scoped (by the user, correctly caught in
+review before any Dockerfile was written) as a third "headless Flask
+process" to containerize alongside `target_app`/`operator_console`.
+Checked `agent/capability_api.py` directly: `/invoke` calls
+`run_capability(capability, params)` with no `headed` override, and
+`agent.engine.run_capability` defaults `headed=True` — so every invoke
+launches a real, visible Chromium, identical to `replay.py`. Corrected
+scope to two services, not three, before writing any container config.
+Resolved by exposing `CAPABILITY_API_HEADED` (env var, default
+`"true"`) so the behavior is an explicit, documented setting rather
+than an accidental default now that it'd been noticed — not containerized
+itself, since forcing it headless purely to fit in a container would
+have been a behavior change no one asked for, and running it headed
+inside a container reintroduces the exact X11 complexity ruled out for
+`discover.py`/`replay.py`.
+
+**A second, smaller bug found while first testing the containers**:
+`target_app/server.py` and `agent/operator_console.py`'s `app.run()`
+calls had no explicit `host`, so Flask's default (loopback-only) meant
+the containers' published ports (`8000`, `8100`) would be unreachable
+from the host despite `docker compose up` reporting both as started.
+Fixed by reading `host=os.environ.get("FLASK_RUN_HOST", "127.0.0.1")`
+in both, with `docker-compose.yml` setting `FLASK_RUN_HOST=0.0.0.0` for
+both services — host-run behavior (no env var set) is unchanged.
+
+**Verified end to end, not just "containers started":**
+- `docker compose up -d --build`: both images built and both containers
+  reported running.
+- `curl http://localhost:8000/members?member_id=10001` from the host —
+  200, real member data in the response (containerized target_app is
+  actually reachable and serving, not just alive).
+- `curl http://localhost:8100/` — 200, and the page showed a *real*
+  paused run (`member_balance_lookup_..._7e33b2`, step 3,
+  `on_checkpoint_failure`) left over in `evidence/sessions/sessions.db`
+  from earlier host-side testing — proof the containerized
+  `operator_console` reads the exact same shared session state a host
+  process writes, not a fresh/empty one. Its screenshot route also
+  returned 200, confirming the bind-mounted screenshot path resolved
+  correctly across the host/container boundary.
+- `python -m agent.replay --capability
+  schema/capabilities/member_balance_lookup.compiled.json --input
+  member_id=10001 --headless` from the host, against the *containerized*
+  `target_app` — `status: "success"`, correct outputs. The replay engine
+  doesn't know or care whether its target is containerized.
+- `docker compose run --rm target_app python -m target_app.seed` —
+  exercises the README's documented first-time-setup path; confirmed it
+  seeds `target_app/members.db` on the host filesystem (via the bind
+  mount), matching what `python -m target_app.seed` does when run
+  directly.
+- `CAPABILITY_API_HEADED=false python -m agent.capability_api`, invoked
+  against `member_id=10001` — `200`, `status: "success"`, ran headless
+  with no other behavior change.
+
+**Also updated:** README.md gained a "Quick start via Docker" section
+(alongside, not replacing, the venv instructions) covering `docker
+compose up`, the bind-mount/shared-state model, and first-time seeding.
+
+**Committed:** pending.
+
+---
+
+## 2026-08-16 — `--repeat N` stability flag on `agent.replay`
+
+**Built:** `--repeat N` on `agent/replay.py` (default `1`, existing
+single-result behavior unchanged). For `N > 1`, reruns the same
+capability + params N times — each a fully independent
+`run_capability()` call, fresh browser, no shared state — and prints a
+per-run line (`status`, `outcome_code` if present, duration) followed
+by a stability summary: counts by `status`, counts by `outcome_code`,
+and min/max/avg duration. Exit code is nonzero only if any run hard-failed.
+`--repeat 0` (or negative) is rejected with a clear message before any
+browser launches, same posture as existing input validation. Exists to
+demonstrate, not just assert, the brief's own claim that
+record-once/replay-many is only viable because the target UI is stable
+across runs.
+
+**Verified:**
+- `--repeat 5` against `member_balance_lookup` / `member_id=10001`
+  (headless, against a locally-running `target_app`) — `5/5 success`,
+  durations `5.65s`–`6.41s`.
+- `--repeat 3` against `member_id=99999` — confirms the outcome-code
+  breakdown works for the business-outcome branch too:
+  `3/3 business_outcome`, all `MEMBER_NOT_FOUND`.
+- `--repeat 0` — rejected (`--repeat must be >= 1`, exit code 2),
+  before touching the browser.
+- `--repeat 1` (default) — output and exit-code behavior byte-for-byte
+  unchanged from before this change (single JSON result to stdout,
+  `{"success": 0, "business_outcome": 0, "hard_failure": 1}` mapping).
+
+**Evidence captured**: `--repeat 8` against `member_balance_lookup` /
+`member_id=10001`, saved to
+`evidence/stability/member_balance_lookup_10001.txt` — `8/8 success`,
+durations `5.54s`–`6.65s`, avg `5.75s`. Added as its own entry in
+`evidence/README.md`.
+
+**Committed:** pending.

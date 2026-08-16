@@ -3,15 +3,21 @@ this project takes on. A catalog of callable capabilities an AI agent
 could discover and invoke, backed directly by compiled artifacts.
 
 Demonstration-scale only, deliberately: no auth, no queueing, one
-synchronous headed-browser run per invoke, no rate limiting. Building
-scaling infrastructure isn't rewarded per the brief — see CLAUDE.md and
+synchronous browser run per invoke, no rate limiting. Building scaling
+infrastructure isn't rewarded per the brief — see CLAUDE.md and
 REPORT.md's Cuts section for why this stops here.
+
+CAPABILITY_API_HEADED (default "true") controls whether that run is
+headed or headless — see CLAUDE.md for why this is the seam a
+production deployment would flip, not the browser dependency itself
+going away.
 
 Run: python -m agent.capability_api  (serves http://localhost:8200)
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -23,6 +29,10 @@ from agent.models import Capability
 CAPABILITIES_DIR = Path("schema/capabilities")
 
 app = Flask(__name__)
+
+
+def _headed_default() -> bool:
+    return os.environ.get("CAPABILITY_API_HEADED", "true").strip().lower() not in ("0", "false", "no")
 
 
 def _scan_capabilities() -> dict[str, Capability]:
@@ -73,7 +83,7 @@ def invoke_capability(capability_id: str):
         return jsonify({"error": "request body must be a JSON object of param name/value pairs"}), 400
 
     try:
-        result = run_capability(capability, params)
+        result = run_capability(capability, params, headed=_headed_default())
     except InputValidationError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # safety net — run_capability already turns most failures into HardFailureResult

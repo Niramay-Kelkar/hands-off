@@ -56,22 +56,69 @@ python -m target_app.server
 # serves at http://localhost:8000
 ```
 
+### Quick start via Docker
+
+`target_app` and `operator_console` are plain Flask processes with no
+browser dependency, so they're the two pieces that make sense to
+containerize. `agent.discover`, `agent.replay`, and
+`agent.capability_api` all drive a real, visible Playwright browser via
+`agent.engine.run_capability()` — that needs X11/VNC forwarding to run
+in a container, which isn't worth the complexity here, so those three
+stay on the host (venv setup above) and talk to the containerized
+services over `localhost`.
+
+```bash
+docker compose up -d --build
+# target_app:        http://localhost:8000
+# operator_console:   http://localhost:8100
+```
+
+Both containers bind-mount the repo root, so they share
+`target_app/members.db` and `evidence/sessions/sessions.db` with
+whatever you run on the host — no separate seeding or config needed. If
+`target_app/members.db` doesn't exist yet (it's gitignored, generated
+data), seed it once via either environment:
+
+```bash
+docker compose run --rm target_app python -m target_app.seed
+# or, with the host venv active: python -m target_app.seed
+```
+
+Bring the containers down with `docker compose down`.
+
 ## Demo path
 
-Run the agent on a goal (discovery):
+With the target app running (see above), in another terminal:
+
+Run the agent on a goal (discovery — requires `ANTHROPIC_API_KEY`, writes
+the raw trajectory, not yet a replayable artifact):
 
 ```bash
 python -m agent.discover \
-  --goal "look up member 12345 and read their current savings balance" \
+  --goal "look up member 10001 and read their name and current savings balance" \
   --target http://localhost:8000/members \
-  --out schema/member_balance_lookup.json
+  --out evidence/runs/demo_trajectory.json
 ```
 
-Replay the resulting artifact with new inputs:
+Compile the trajectory into a replayable capability artifact. The
+mechanical layer (steps/locators/checkpoints/inputs/outputs) comes from
+the trajectory; the policy layer (risk_class, expected_outcomes,
+guardrails, escalation_policy) comes from `--policy`, here the
+hand-authored reference schema:
+
+```bash
+python -m agent.compile \
+  --trajectory evidence/runs/demo_trajectory.json \
+  --policy schema/example_artifact.json \
+  --param member_id=10001 \
+  --out schema/capabilities/member_balance_lookup.compiled.json
+```
+
+Replay the compiled artifact with new inputs — no LLM involved:
 
 ```bash
 python -m agent.replay \
-  --capability schema/member_balance_lookup.json \
+  --capability schema/capabilities/member_balance_lookup.compiled.json \
   --input member_id=67890
 ```
 
@@ -79,11 +126,35 @@ Replay against a seeded failure case, to see outcome/error handling:
 
 ```bash
 python -m agent.replay \
-  --capability schema/member_balance_lookup.json \
+  --capability schema/capabilities/member_balance_lookup.compiled.json \
   --input member_id=99999   # seeded as "not found" in the target app
 ```
 
-Logs and screenshots from both runs are written to `/evidence`.
+To see the human escalation path, start the operator console in a third
+terminal:
+
+```bash
+python -m agent.operator_console   # serves http://localhost:8100
+```
+
+then replay against `member_id=10004` (seeded interstitial dialog). The
+run pauses and blocks; dismiss the dialog in the same live browser
+window and click Resume in the console to let it continue.
+
+Logs and screenshots from every run are written to `evidence/runs/` and
+`evidence/sessions/`. A curated, labeled set of example output already
+lives in `/evidence` — see `evidence/README.md` for what each piece
+demonstrates.
+
+### Agent-facing API (stretch goal)
+
+```bash
+python -m agent.capability_api   # serves http://localhost:8200
+```
+
+`GET /capabilities` lists compiled artifacts in `schema/capabilities/`;
+`POST /capabilities/<id>/invoke` runs one with a flat JSON params body.
+See CLAUDE.md for details.
 
 ## Running without live services
 
@@ -91,20 +162,25 @@ The discovery step requires a live LLM API key. Replay does not call the
 LLM at all and can run entirely offline against the local target app, once
 an artifact has already been recorded. If you want to inspect the system
 without any API key, run the target app locally and use `agent.replay`
-against the example artifact in `schema/example_artifact.json`.
+against either the hand-authored `schema/example_artifact.json` or the
+already-compiled `schema/capabilities/member_balance_lookup.compiled.json`.
 
 ## Project structure
 
 ```
 hands-off/
-  agent/          discovery loop, replay engine, artifact schema/models
-  target_app/     the local demo bank application being automated
-  schema/         saved capability artifacts (JSON)
-  evidence/       logs and screenshots from discovery and replay runs
-  tests/
-  CLAUDE.md       project context and design decisions
-  REPORT.md       design write-up (architecture, schema, error handling, etc.)
-  README.md       this file
+  agent/                   discovery loop, replay engine, compiler, artifact
+                            schema/models, operator console, capability API
+  target_app/               the local demo bank application being automated
+  schema/
+    example_artifact.json   hand-authored reference artifact (schema docs)
+    capabilities/            compiled artifacts served by agent.capability_api
+  evidence/                 curated example output (see evidence/README.md);
+                            raw runs/sessions from your own use are gitignored
+  CLAUDE.md                 project context and design decisions
+  BUILD_LOG.md              session-by-session build history
+  REPORT.md                 design write-up (architecture, schema, error handling, etc.)
+  README.md                 this file
 ```
 
 ## Design write-up

@@ -95,6 +95,20 @@ pending. `result.txt` is the final `success` after resume.
 this gate — see `replays/success_10001/log.jsonl`, which has no
 `risk_gate_pause` event at all.
 
+## `stability/`
+
+Evidence for the brief's own claim that record-once/replay-many is only
+viable because the target UI is stable across runs — not just asserted,
+demonstrated. `member_balance_lookup_10001.txt` is the output of
+`agent.replay --repeat 8` (see `agent/replay.py` and CLAUDE.md) against
+the same compiled capability and the same input used everywhere else in
+this evidence set: 8 consecutive headless replays, `8/8 success`, zero
+retries, zero escalations, durations tightly clustered
+(`min=5.54s max=6.65s avg=5.75s`). `--repeat` reuses `run_capability()`
+unmodified — one fresh browser per run — so this is 8 independent,
+real replays against the live target app, not a single run's timing
+sliced eight ways.
+
 ## `capability_api/`
 
 Evidence for the one stretch goal taken on: the agent-facing HTTP
