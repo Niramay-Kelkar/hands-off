@@ -279,3 +279,43 @@ escalation testing still running/blocked in the background — killed,
 unrelated to this bug.
 
 **Committed:** pending.
+
+---
+
+## 2026-08-16 — Agent-facing capability API (stretch goal)
+
+**Built:** `agent/capability_api.py` — the one stretch goal taken on
+this project, per the brief's "agent-facing capability catalog"
+description. `GET /capabilities` scans `schema/capabilities/` (new
+directory — `schema/example_artifact.json` stays where it is,
+untouched, as schema documentation, excluded by directory boundary
+rather than any filename inference) and returns a catalog entry per
+compiled artifact. `POST /capabilities/<id>/invoke` is a thin wrapper
+around the unmodified `engine.run_capability()` — same three-shape
+`ReplayResult` contract, no new envelope, mapped to `200`
+(success/business_outcome) or `500` (hard_failure). Demonstration-scale
+only, by design: no auth, no queueing, one synchronous headed run per
+invoke — noted in CLAUDE.md as a REPORT.md Cuts item.
+
+Moved `schema/member_balance_lookup.compiled.json` into the new
+`schema/capabilities/` directory, which is now the conventional home
+for compiled artifacts meant to be served.
+
+**Verified:** started target_app + `capability_api` together.
+`GET /capabilities` returned exactly one entry (`member_balance_lookup`)
+sourced only from `schema/capabilities/`, confirming
+`schema/example_artifact.json`'s identical `capability_id` doesn't leak
+into the catalog. `POST .../invoke` with `member_id=10001` → `200`,
+`status: "success"`, correct outputs. Same route with `member_id=10002`
+→ `200` (not `500`), `status: "business_outcome"`,
+`outcome_code: "ACCESS_DENIED"` — confirming business outcomes map to
+`200` as designed, not treated as errors at the HTTP layer either.
+Also spot-checked the error paths: missing required param → `400` with
+a clear message, unknown capability_id → `404`. All three request/
+response pairs (catalog + both invokes) saved as curated evidence under
+`evidence/capability_api/`.
+
+**Bugs found & fixed:** none — worked as designed on the first
+implementation.
+
+**Committed:** pending.

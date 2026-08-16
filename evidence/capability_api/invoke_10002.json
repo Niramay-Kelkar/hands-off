@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "http://localhost:8200/capabilities/member_balance_lookup/invoke",
+    "body": {
+      "member_id": "10002"
+    }
+  },
+  "http_status": 200,
+  "response": {
+    "outcome_code": "ACCESS_DENIED",
+    "status": "business_outcome",
+    "step_id": 2
+  }
+}

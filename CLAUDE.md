@@ -357,11 +357,32 @@ artifact relies entirely on the policy's artifact-level default for
 every step, even ones a hand-authored artifact might override
 differently.
 
+## Stretch goal: agent-facing capability API — built (agent/), the only stretch goal taken on
+
+`agent/capability_api.py` (Flask, port 8200, same pattern as
+`operator_console.py`) — `GET /capabilities` scans `schema/capabilities/`
+only (not `schema/example_artifact.json`, which stays put as schema
+documentation — excluded by directory boundary, not inferred, so editing
+it later can't silently change what the catalog serves) and returns
+`capability_id`/`description`/`version`/`risk_class`/`inputs`/`outputs`
+for each. `POST /capabilities/<id>/invoke` takes a flat JSON params
+object, calls `engine.run_capability()` unchanged, and returns the exact
+`ReplayResult` JSON body with no translation layer — `200` for
+`success`/`business_outcome`, `500` for `hard_failure`, `400`/`404` for
+bad input / unknown capability.
+
+**Demonstration-scale only, deliberately**: no auth, no queueing, one
+synchronous headed-browser run per invoke, no rate limiting. The brief
+explicitly doesn't reward prematurely-built scaling infrastructure —
+restate this in REPORT.md's Cuts section if asked why there's no queue
+or worker pool here.
+
+`schema/capabilities/` is now the conventional home for compiled
+artifacts meant to be served/invoked — `agent/compile.py --out` should
+target it going forward.
+
 ## Open / not yet decided
 
-- Whether to pursue any stretch goal, and which one (pick at most one —
-  agent-facing capability catalog and cross-tenant reuse are the two most
-  aligned with the brief's core thesis).
 - Compiler phase: the compiled artifact's `guardrails.allowlist_routes`
   should be narrowed to the routes actually visited during the
   successful trajectory, not carried over as discovery-time's wide-open

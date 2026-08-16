@@ -1,0 +1,27 @@
+{
+  "capabilities": [
+    {
+      "capability_id": "member_balance_lookup",
+      "description": "Search for a member by ID and read their current savings balance.",
+      "inputs": [
+        {
+          "name": "member_id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "member_name",
+          "type": "string"
+        },
+        {
+          "name": "savings_balance",
+          "type": "money"
+        }
+      ],
+      "risk_class": "read_only",
+      "version": 1
+    }
+  ]
+}
