@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from flask import Flask, abort, redirect, render_template_string, send_file, url_for
+from flask import Flask, abort, redirect, render_template_string, request, send_file, url_for
 
 from agent import escalation
 
@@ -50,14 +50,18 @@ _TEMPLATE = """
 
 @app.route("/")
 def index():
-    run = escalation.latest_paused_run()
+    # ?run_id= scopes the view to a specific run; with no run_id, falls back
+    # to "whatever's most recently paused" so walking up to the console cold
+    # still works exactly as before.
+    run_id = request.args.get("run_id")
+    run = escalation.get_run(run_id) if run_id else escalation.latest_paused_run()
     return render_template_string(_TEMPLATE, run=run)
 
 
 @app.route("/screenshot/<run_id>")
 def screenshot(run_id: str):
-    run = escalation.latest_paused_run()
-    if run is None or run["run_id"] != run_id or not run["screenshot_path"]:
+    run = escalation.get_run(run_id)
+    if run is None or not run["screenshot_path"]:
         abort(404)
     path = Path(run["screenshot_path"]).resolve()
     if not path.exists():

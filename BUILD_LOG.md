@@ -610,3 +610,107 @@ durations `5.54s`–`6.65s`, avg `5.75s`. Added as its own entry in
 `evidence/README.md`.
 
 **Committed:** pending.
+
+---
+
+## 2026-08-16 — Real bug found via REPORT.md fact-checking: ACT-phase escalations still redid the action on retry/resume
+
+REPORT.md's own escalation sequence diagram and Section 3's "any retry,
+automatic or human-resumed, only ever re-verifies, never re-acts" claim
+were only true for the one escalation path actually exercised before now
+— `on_unrecognized_dialog`, a **CHECK**-phase trigger (`10004`'s
+interstitial). They were never true for **ACT**-phase triggers.
+
+**The gap.** `agent/engine.py`'s `_act_once` did three things inside one
+try block: resolve the locator, perform the action
+(`ACTION_REGISTRY.get(...)(...)`), then — still inside the same
+try/except — check the post-action route guardrail and, if configured,
+run the settle-wait (`page.wait_for_load_state("networkidle", ...)`). Any
+exception from *any* of those three raised the same `on_step_timeout` or
+`on_hard_failure` trigger, and `_run_with_escalation`'s retry/escalate
+path always re-called the *whole* `_act_once` — meaning a settle-wait
+timeout that happened strictly *after* the action had already fired and
+registered still caused the action to be redone, both by an automatic
+retry and, if that also failed, by a human resuming an escalated run.
+This affects exactly the two triggers `_act_once` can raise:
+`on_step_timeout` and `on_hard_failure`. Both are configured
+`then: "escalate"` in the shipped `member_balance_lookup` policy
+(`on_step_timeout: {retry: 1, then: escalate}`,
+`on_hard_failure: {retry: 0, then: escalate}`), so this wasn't a
+theoretical edge case — it was live in the shipped artifact's own policy,
+just never exercised by any prior test, because every prior escalation
+test (`10004`) happened to hit the dialog-detection path in `_check_once`
+instead, which was never affected by this bug in the first place.
+
+**The fix.** Split `_act_once` into two independently-retried phases,
+extending the existing ACT/CHECK split rather than replacing it:
+- `_act_once` now does exactly two things — resolve the locator, perform
+  the action — and returns `(resolved, before_url)`. Once
+  `ACTION_REGISTRY`'s call returns without raising, this function is
+  never called again for this step, no matter what fails afterward.
+- `_settle_once` (new) does the post-action route check and the optional
+  settle-wait, given the `(resolved, before_url)` `_act_once` produced.
+  It never touches `ACTION_REGISTRY`. `_execute_step` now runs three
+  `_run_with_escalation`-wrapped phases per step — ACT, SETTLE, CHECK —
+  instead of two; a SETTLE-phase retry or escalation-resume only
+  re-runs `_settle_once`.
+
+The `on_step_timeout`/`on_hard_failure` trigger strings, and the
+escalation policy's retry counts for them, are unchanged — only *what*
+gets re-invoked on retry changed.
+
+**Verified with a new standalone fixture** (not shipped code, same
+pattern as the earlier synthetic `risk_class: "mutating"` fixture) —
+a `Capability` built directly via the Pydantic models with a single step:
+a custom `counter_click` action (registered ad hoc into
+`ACTION_REGISTRY`, not part of the shipped action set) that appends to a
+file-backed counter — observable independently of any page state — then
+clicks a harmless, non-navigating element, then fires a background,
+non-awaited `fetch()` against `target_app`'s seeded slow-load route
+(`member_id=10003`, a real 3.5s server-side sleep) via `page.evaluate()`
+with no returned promise, so the click itself returns immediately but the
+page has genuine pending network activity afterward. The step's
+settle-wait is set to `timeout_ms: 500`, and `escalation_policy` mirrors
+the shipped policy's `on_step_timeout: {retry: 1, then: escalate}`
+exactly.
+
+Run through the real `engine.run_capability()`, in a background thread so
+the main script could poll `escalation.latest_paused_run()` and resume
+through the real `agent.operator_console` HTTP endpoint (not
+in-process):
+1. The run escalated via `on_step_timeout`, as configured.
+2. Counter was `1` after the initial attempt *and* the automatic retry —
+   the retry did not re-invoke the action.
+3. Resumed via a real `POST /resume/<run_id>` against the running
+   `operator_console` process, after waiting out the background fetch's
+   3.5s window (same as a real operator would, just by not being
+   instantaneous).
+4. Counter was still `1` after resume, and the run reached a clean
+   `status: "success"`.
+
+**Confirmed this is a real regression test, not just a passing script**:
+stashed the `agent/engine.py` fix (`git stash push -- agent/engine.py`),
+re-ran the identical fixture against the pre-fix code, and it failed
+exactly as predicted — counter was `2` after only the initial attempt
+and one automatic retry (i.e. the retry re-clicked). Restored the fix
+(`git stash pop`) and re-ran clean. Also re-ran the full existing replay
+matrix (`10001` success, `10002` `ACCESS_DENIED`, `99999`
+`MEMBER_NOT_FOUND`) against the fixed code to confirm zero behavior
+change for the CHECK-phase and non-escalating paths.
+
+**Secondary fix, same pass**: `agent/escalation.py`'s
+`latest_paused_run()` was the only way `operator_console.py` looked up a
+run — an unscoped `SELECT ... ORDER BY updated_at DESC LIMIT 1`, fine
+for one run paused at a time but not actually "this run's state" if more
+than one were ever paused concurrently. Added `escalation.get_run(run_id)`
+(scoped `SELECT ... WHERE run_id=?`); `operator_console.py`'s `/` route
+now accepts an optional `?run_id=` and uses `get_run` when present,
+falling back to `latest_paused_run()` with no `run_id` (preserves the
+existing "walk up to the console cold" behavior exactly). Also fixed
+`/screenshot/<run_id>` to use the new scoped lookup directly instead of
+re-fetching "latest" and comparing — it was silently 404-ing for any
+run's screenshot other than the single most-recently-paused one, which
+this change also happens to fix. Verified: `/?run_id=<unknown>` correctly
+renders "no run" rather than falling back to an unrelated paused run.
+
+**Committed:** pending.

@@ -5,11 +5,22 @@ agent.models) — business outcomes and hard failures must never be
 conflated. A recoverable condition that resolves via retry never shows
 up in the return value at all, only in the structured log.
 
-Each step is split into two phases with separate retry handling:
+Each step is split into three phases with separate retry handling:
 
 - ACT (resolve the step's locator, perform the action) — retrying this
   phase means redoing the action, which is only safe because nothing
-  has happened yet if this phase itself failed.
+  has happened yet if this phase itself failed. Once the action call
+  itself returns without raising, it is never retried again for this
+  step, no matter what fails afterward.
+- SETTLE (the post-action route guardrail check, then the optional
+  settle-wait) — everything that can only fail *after* the action has
+  already fired. Retrying this phase re-checks/re-waits on the page,
+  never re-invokes the action. This split exists because a settle-wait
+  timeout (e.g. a slow post-click page load) used to be indistinguishable
+  from an ACT-phase failure, so retrying it redid the click that had
+  already registered — exactly the double-submission risk the ACT/CHECK
+  split was meant to prevent, just not fully closed until ACT and SETTLE
+  were separated. See BUILD_LOG.md.
 - CHECK (unexpected-dialog interrupt, then checkpoint evaluation) —
   retrying this phase means re-checking current page state, never
   re-running the action. This matters for two reasons: an automatic
@@ -150,7 +161,14 @@ def _execute_step(step: Step, ctx: RunContext) -> ReplayResult | None:
     """Returns a terminal ReplayResult, or None to continue to the next step."""
     overrides = step.escalation_override or {}
 
-    ok, resolved, terminal = _run_with_escalation(step, ctx, overrides, lambda: _act_once(step, ctx))
+    ok, act_result, terminal = _run_with_escalation(step, ctx, overrides, lambda: _act_once(step, ctx))
+    if not ok:
+        return terminal
+    resolved, before_url = act_result
+
+    ok, resolved, terminal = _run_with_escalation(
+        step, ctx, overrides, lambda: _settle_once(step, ctx, resolved, before_url)
+    )
     if not ok:
         return terminal
 
@@ -166,8 +184,10 @@ def _run_with_escalation(
     """Calls attempt_fn() repeatedly per the step's escalation policy.
     attempt_fn() returns ("ok", value) or ("failure", trigger, detail).
     On escalation, attempt_fn() is called again after resume — for the
-    CHECK phase that's a re-check of current state, for the ACT phase
-    that's a redo, since ACT hasn't succeeded yet if it's retrying at all."""
+    ACT phase that's a redo, since ACT hasn't succeeded yet if it's
+    retrying at all; for the SETTLE and CHECK phases it's always a
+    re-check of current state, never a redo of the action, since by the
+    time either phase runs the action has already fired."""
     attempt = 0
     while True:
         outcome = attempt_fn()
@@ -210,6 +230,10 @@ def _run_with_escalation(
 
 
 def _act_once(step: Step, ctx: RunContext) -> tuple:
+    """Resolves the step's locator and performs the action — nothing else.
+    Once ACTION_REGISTRY's call returns without raising, the action has
+    fired; any failure from here on (see _settle_once) must never cause
+    this function to be called again for this step."""
     try:
         resolved: ResolvedLocator | None = None
         if step.locator is not None:
@@ -218,6 +242,21 @@ def _act_once(step: Step, ctx: RunContext) -> tuple:
         guardrails.check_action_type(step.action.type, ctx.artifact.guardrails.allowed_action_types)
         before_url = ctx.page.url
         ACTION_REGISTRY.get(step.action.type)(step.action, resolved, ctx)
+        return ("ok", (resolved, before_url))
+    except PWTimeoutError as exc:
+        return ("failure", "on_step_timeout", str(exc)[:300])
+    except (LocatorResolutionError, guardrails.GuardrailViolation) as exc:
+        return ("failure", "on_hard_failure", str(exc)[:300])
+    except Exception as exc:  # genuinely unexpected — hard failure trigger
+        return ("failure", "on_hard_failure", f"{type(exc).__name__}: {exc}"[:300])
+
+
+def _settle_once(step: Step, ctx: RunContext, resolved: ResolvedLocator | None, before_url: str) -> tuple:
+    """Everything that can only fail *after* the action already fired: the
+    post-action route guardrail check, then the optional settle-wait.
+    Never touches ACTION_REGISTRY — a retry or escalation-resume here only
+    re-checks the route and re-waits, it never redoes the action."""
+    try:
         if ctx.page.url != before_url:
             guardrails.check_route(ctx.page.url, ctx.allowed_origin, ctx.artifact.guardrails.allowlist_routes)
 
@@ -227,7 +266,7 @@ def _act_once(step: Step, ctx: RunContext) -> tuple:
         return ("ok", resolved)
     except PWTimeoutError as exc:
         return ("failure", "on_step_timeout", str(exc)[:300])
-    except (LocatorResolutionError, guardrails.GuardrailViolation) as exc:
+    except guardrails.GuardrailViolation as exc:
         return ("failure", "on_hard_failure", str(exc)[:300])
     except Exception as exc:  # genuinely unexpected — hard failure trigger
         return ("failure", "on_hard_failure", f"{type(exc).__name__}: {exc}"[:300])

@@ -112,3 +112,16 @@ def latest_paused_run() -> sqlite3.Row | None:
         ).fetchone()
     finally:
         conn.close()
+
+
+def get_run(run_id: str) -> sqlite3.Row | None:
+    """Scoped lookup for a specific run, as opposed to latest_paused_run()'s
+    system-wide "whatever's most recently paused" — used by the operator
+    console when it's pointed at a particular run rather than just walked
+    up to cold."""
+    conn = _connect()
+    conn.row_factory = sqlite3.Row
+    try:
+        return conn.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+    finally:
+        conn.close()

@@ -175,11 +175,16 @@ above), `guardrails.py`, `escalation.py`, `operator_console.py`,
 `python -m agent.replay --capability <path> --input k=v [...]`.
 
 Each step splits into an ACT phase (resolve locator + perform the
-action) and a CHECK phase (unrecognized-dialog interrupt, then
-checkpoint eval), each with its own retry/escalate handling — retries,
-automatic or human-resumed, only ever redo CHECK, never re-run the
-action. `text_present`'s `scope` is a contract with the target app's
-`aria-label` regions (see target_app/README.md).
+action), a SETTLE phase (post-action route guardrail check + optional
+settle-wait), and a CHECK phase (unrecognized-dialog interrupt, then
+checkpoint eval), each with its own retry/escalate handling — once ACT's
+action call succeeds, retries (automatic or human-resumed) at SETTLE or
+CHECK only ever re-check/re-wait, never re-run the action. ACT and
+SETTLE were originally one phase; split apart after a settle-wait
+timeout was found to still redo an already-fired action on retry — see
+CLAUDE.md's Safety section and BUILD_LOG.md. `text_present`'s `scope` is
+a contract with the target app's `aria-label` regions (see
+target_app/README.md).
 
 Cut, for REPORT.md: one process owns the Playwright browser end to end,
 headed, no RPC. Escalation is a shared SQLite `runs` table
@@ -280,6 +285,24 @@ to be the focus of, not the UI polish.
   output) specifically to exercise this against real data — verified
   the raw value appears in neither the trajectory JSON, `log.jsonl`, nor
   the screenshot, only `[REDACTED]`. See BUILD_LOG.md.
+- **"A retry never re-acts," verified across every escalation trigger,
+  not just the dialog case.** `agent/engine.py` splits each step into
+  ACT (resolve locator + perform the action), SETTLE (post-action route
+  check + optional settle-wait), and CHECK (dialog interrupt + checkpoint)
+  — three independently-retried phases. Once ACT's `ACTION_REGISTRY` call
+  returns without raising, it is never called again for that step; a
+  SETTLE- or CHECK-phase retry or escalation-resume only re-checks, it
+  never redoes the action. This used to be true only for CHECK-phase
+  triggers (`on_unrecognized_dialog`, the only one any prior test
+  exercised) — `on_step_timeout` and `on_hard_failure`, both configured
+  `then: "escalate"` in the shipped policy, could still redo an action
+  that had already fired if the failure came from the settle-wait
+  afterward, until ACT and SETTLE were split apart. Verified with a
+  standalone counter-instrumented fixture proving zero re-invocations of
+  the action across an initial attempt, an automatic retry, and a human
+  resume via the real operator console — and, stashing the fix, that the
+  same fixture fails against the pre-fix code exactly as predicted. See
+  BUILD_LOG.md.
 
 ## Deliverables — exact required structure, do not deviate
 

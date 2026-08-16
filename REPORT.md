@@ -2,6 +2,21 @@
 
 ## 1. Architecture
 
+```mermaid
+flowchart LR
+    G["Goal + target"] --> D["Discovery<br/>LLM observe/decide/act"]
+    D --> T["Raw trajectory"]
+    T --> C["Compiler"]
+    P["Hand-authored policy<br/>outcomes, guardrails, risk_class"] --> C
+    C --> A["Compiled capability artifact"]
+    A --> R["Replay engine<br/>no LLM in the loop"]
+    R --> O1["success"]
+    R --> O2["business_outcome"]
+    R --> O3["hard_failure"]
+    R -. escalates .-> H["Human operator<br/>via console"]
+    H -. resumes .-> R
+```
+
 The system is built around one governing idea: discovery and replay are two different programs that share one contract. Discovery is an LLM-driven observe/decide/act loop — slow, non-deterministic, expensive, and run exactly once per capability. Replay executes the same flow with no model in the decision loop — fast, cheap, deterministic, and run every time an AI agent actually needs the capability in production. The artifact is the seam between them: what discovery proves, replay trusts.
 
 Perception is accessibility-tree-first rather than screenshot-or-coordinate-based, for a specific reason: it's the same abstraction the replay engine's locators are built on, so what the model reasons over during discovery and what the compiler turns into a locator are already speaking the same language. A screenshot-based agent would have required a translation step between "what the model saw" and "what the artifact can reliably re-find" — accessibility-tree-first removes that translation step entirely.
@@ -22,7 +37,15 @@ Compiled locators only ever contain strategies discovery actually verified. A sy
 
 ## 3. Determinism & error handling
 
-The premise underlying record-once/replay-many is that a legacy UI is stable enough to make deterministic replay viable at all — tested directly by running the same compiled capability against the same input eight times in a row and confirming eight successes with no variance beyond ordinary network timing (`evidence/stability/`). Every replay resolves to exactly one of three outcomes: success, a business outcome, or a hard failure. A business outcome — "no such member," "access denied" — means the automation worked correctly and reached a legitimate, expected end state; it is returned as a normal result, never as an error. A hard failure means something genuinely unexpected happened, and the result carries which step, what was expected, and what was observed, plus a screenshot when the artifact's evidence policy calls for one on that outcome (configurable per artifact, not guaranteed universally). Conflating the first two is, in our experience building this, the easiest mistake to make and the most damaging one to ship, because it turns every legitimate "no" into a page for a human.
+The premise underlying record-once/replay-many is that a legacy UI is stable enough to make deterministic replay viable at all — tested directly by running the same compiled capability against the same input eight times in a row and confirming eight successes with no variance beyond ordinary network timing (`evidence/stability/`). Every replay resolves to exactly one of three outcomes:
+
+| Outcome | Meaning | HTTP status (capability API) |
+|---|---|---|
+| `success` | Goal achieved, declared outputs returned | 200 |
+| `business_outcome` | A legitimate, expected non-happy-path result (e.g. "member not found") | 200 |
+| `hard_failure` | Something genuinely unexpected — needs investigation | 500 |
+
+A business outcome — "no such member," "access denied" — means the automation worked correctly and reached a legitimate, expected end state; it is returned as a normal result, never as an error. A hard failure means something genuinely unexpected happened, and the result carries which step, what was expected, and what was observed, plus a screenshot when the artifact's evidence policy calls for one on that outcome (configurable per artifact, not guaranteed universally). Conflating the first two is, in our experience building this, the easiest mistake to make and the most damaging one to ship, because it turns every legitimate "no" into a page for a human.
 
 That distinction was tested against real failure, not assumed. Three bugs found during verification are worth describing directly, because each demonstrates a different way "looks correct" and "is correct" can diverge in a system like this:
 
@@ -41,6 +64,24 @@ The credibility of the extension story rests entirely on the perception choice m
 The multi-tenant argument follows the same logic. Many tenants running the same underlying vendor product, configured and branded differently, is exactly the scenario accessibility-first locators are suited to: a control's accessible name is tied to what it means to a user, not to how a particular tenant's CSS or markup happens to be structured, so it should survive a rebrand that leaves the underlying semantics intact. This is a bet, not a proof — it was not tested against a second, differently-configured instance of the same application. What the system does provide is a way to detect when that bet stops holding: every locator resolution attempt, including which ranked strategy actually succeeded, is logged. A capability that begins consistently falling through to a lower-priority strategy, or fails to resolve at all, is a concrete operational signal that a given tenant's version has drifted — the trigger for re-recording or authoring a tenant-specific override, rather than something failing silently in production.
 
 ## 5. Escalation & handoff
+
+```mermaid
+sequenceDiagram
+    participant Replay as Replay process
+    participant Store as Shared session store
+    participant Console as Operator console
+    participant Human as Human operator
+
+    Replay->>Store: write state (owner=human, reason, screenshot)
+    Replay->>Replay: block, poll store
+    Human->>Console: open console
+    Console->>Store: read state
+    Console-->>Human: show reason + screenshot
+    Human->>Console: click Resume
+    Console->>Store: write owner=automation
+    Replay->>Store: poll detects flip
+    Replay->>Replay: re-check paused step, continue
+```
 
 When a replay run cannot safely continue — a checkpoint fails past its retry budget, or a mutating capability's risk class requires confirmation before its first action — the system pauses rather than guesses. It writes its state (which run, which step, why it stopped, a screenshot) to a shared session store and blocks, polling that store for a signal to continue.
 
