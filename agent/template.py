@@ -15,3 +15,13 @@ def substitute(value: str, params: dict[str, str]) -> str:
         return params[name]
 
     return _TOKEN.sub(_replace, value)
+
+
+def templatize(value: str, params: dict[str, str]) -> str:
+    """Inverse of substitute() — used by the compiler to turn a discovery
+    trajectory's literal values back into {{param_name}} tokens. Only
+    exact matches are replaced; no partial/substring substitution."""
+    for name, param_value in params.items():
+        if value == param_value:
+            return "{{" + name + "}}"
+    return value

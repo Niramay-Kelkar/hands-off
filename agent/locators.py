@@ -45,7 +45,13 @@ def _accessibility(scope: Page, strategy: LocatorStrategyModel, params: dict[str
     name_matches = get_field(strategy, "name_matches")
     name_contains = get_field(strategy, "name_contains")
     if name:
+        # exact=True: an artifact compiled from a discovery trajectory was
+        # verified against exact-match resolution (see discovery_tools.py)
+        # — replay must resolve the same `name` locator the same way, or a
+        # capability could behave differently at replay time than what was
+        # actually proven during discovery.
         kwargs["name"] = substitute(name, params)
+        kwargs["exact"] = True
     elif name_matches:
         kwargs["name"] = re.compile(substitute(name_matches, params))
     elif name_contains:

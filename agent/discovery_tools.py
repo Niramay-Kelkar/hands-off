@@ -98,18 +98,25 @@ TOOL_SCHEMAS: list[dict] = [
     },
     {
         "name": "done",
-        "description": "Call once the goal has been fully achieved. Ends the run.",
+        "description": (
+            "Call once the goal has been fully achieved. Reference outputs already captured via "
+            "successful extract calls by name — do not restate their values here; they are pulled "
+            "from what extract actually verified."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "outputs": {
-                    "type": "object",
-                    "description": "Final output name/value pairs.",
-                    "additionalProperties": {"type": "string"},
+                "output_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Names of outputs already captured via successful extract calls, "
+                        "e.g. ['member_name', 'savings_balance']."
+                    ),
                 },
                 "summary": {"type": "string", "description": "Brief description of what was accomplished."},
             },
-            "required": ["outputs", "summary"],
+            "required": ["output_names", "summary"],
         },
     },
 ]
@@ -130,7 +137,13 @@ DISCOVERY_TOOL_REGISTRY: Registry[DiscoveryToolFn] = Registry("discovery_tool")
 def _resolve_unique(page, role: str, name: str) -> tuple[Locator | None, str | None]:
     """0 matches or >1 matches comes back as a clean, actionable message —
     never an uncaught exception that crashes the run."""
-    locator = page.get_by_role(role, name=name)
+    # exact=True: this app's nested-table cells compute compound accessible
+    # names by concatenating descendant text, so a leaf cell's exact name
+    # (e.g. "Jane Doe") is always a substring of its ancestor wrapper
+    # cells' names too — substring matching would make every leaf value
+    # structurally ambiguous against its own wrappers, no matter how the
+    # model refines it.
+    locator = page.get_by_role(role, name=name, exact=True)
     try:
         locator.first.wait_for(state="attached", timeout=3000)
     except PWTimeoutError:
@@ -213,6 +226,18 @@ def _extract(tool_input: dict[str, Any], ctx: DiscoveryContext) -> ToolOutcome:
 
 @DISCOVERY_TOOL_REGISTRY.register("done")
 def _done(tool_input: dict[str, Any], ctx: DiscoveryContext) -> ToolOutcome:
-    outputs = tool_input.get("outputs") or {}
+    output_names = tool_input.get("output_names") or []
     summary = tool_input.get("summary") or ""
+
+    missing = [name for name in output_names if name not in ctx.outputs]
+    if missing:
+        return ToolOutcome(
+            ok=False,
+            detail=(
+                f"output_names {missing} were never successfully extracted in this run; "
+                "call extract for each of them first, then call done again"
+            ),
+        )
+
+    outputs = {name: ctx.outputs[name] for name in output_names}
     return ToolOutcome(ok=True, detail=summary, ended=True, outputs=outputs)

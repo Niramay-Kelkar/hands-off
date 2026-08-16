@@ -283,7 +283,8 @@ infrastructure) — but the seam and reasoning must be real.
    DONE, see "Discovery agent — built (agent/)" below.
 5. Build the artifact compiler — turns a successful discovery trajectory
    into a parameterized artifact (detect which typed values came from the
-   goal's inputs and templatize them, e.g. `{{member_id}}`).
+   goal's inputs and templatize them, e.g. `{{member_id}}`). DONE, see
+   "Artifact compiler — built (agent/)" below.
 6. Error handling, outcome taxonomy, escalation/handoff mechanism.
 7. Safety pass, evidence capture, then REPORT.md.
 
@@ -302,12 +303,59 @@ same way as replay (`agent/guardrails.py`, now taking primitives so both
 callers share one code path), with one addition: a `click` that triggers
 off-allowlist navigation is reverted, not just flagged, since discovery
 is open-ended exploration where containing-and-continuing beats aborting
-the run. Output: a `Trajectory` (`agent/trajectory.py`) — raw discovery
-material, not a compiled artifact; run: `python -m agent.discover --goal
-"..." --target <url> --out <path>`.
+the run. Element resolution (click/type/extract, and replay's `name`
+locator strategy) matches on exact accessible name, not substring — this
+app's nested-table cells compute compound names from concatenated
+descendant text, so substring matching makes every leaf value
+structurally ambiguous against its own ancestor wrappers. `done` only
+accepts `output_names` referencing outputs already captured via a
+successful `extract` — never raw values — so an unverified value can
+never reach an artifact's outputs. Output: a `Trajectory`
+(`agent/trajectory.py`) — raw discovery material, not a compiled
+artifact; run: `python -m agent.discover --goal "..." --target <url>
+--out <path>`.
 
 See BUILD_LOG.md for build history, including a security gap found and
 fixed during this phase (route allowlist checking ignored origin).
+
+## Artifact compiler — built (agent/)
+
+`agent/compile.py` (CLI) drives `agent/compiler.py`'s
+`compile_trajectory()`, which merges a discovery `Trajectory` with an
+authored `agent/policy.py` `PolicySpec` (`--policy` can just be a full
+`Capability` JSON — e.g. `schema/example_artifact.json` — extra fields
+are ignored) into a final `Capability`. The split is strict: the
+mechanical layer (steps, locators, checkpoints, inputs, outputs,
+target) comes entirely from the trajectory and `--param` flags; the
+policy layer (`expected_outcomes`, `guardrails`, `escalation_policy`,
+`risk_class`, `capability_id`/`description`/`version`) comes entirely
+from `--policy`. Neither overrides the other. Run: `python -m
+agent.compile --trajectory <path> --policy <path> --param k=v [...]
+--out <path>`.
+
+Two things worth knowing about how the mechanical layer is built:
+
+- **Checkpoints reference policy's `expected_outcomes`, even though
+  they're mechanically derived.** Every non-final step's checkpoint is
+  `any_of: [element_visible(next successful action's locator),
+  outcome_match(<all policy-declared outcome codes>)]` — found necessary
+  when the first compiled artifact hung forever replaying `10002`/`99999`,
+  because a plain `element_visible` checkpoint has no way to recognize a
+  business outcome as anything but a failure. Referencing codes policy
+  already declares isn't guessing; leaving them unreferenced just meant
+  the two layers were merged into one file without actually being wired
+  together. See BUILD_LOG.md.
+- **No `css` locator strategy is ever synthesized** — only
+  `accessibility` + `text_label`, exactly what discovery verified.
+  Deliberate cut: a css fallback would require re-visiting the live page
+  at compile time (DOM re-walk), which this compiler doesn't do. Note
+  for REPORT.md's Cuts section.
+
+Per-step `escalation_override` is never carried over from the policy
+file's own steps either (steps are 100% mechanical) — a compiled
+artifact relies entirely on the policy's artifact-level default for
+every step, even ones a hand-authored artifact might override
+differently.
 
 ## Open / not yet decided
 
@@ -320,12 +368,5 @@ fixed during this phase (route allowlist checking ignored origin).
   `"/*"` — discovery needs room to explore, but a replayable capability
   should only be allowed back onto the exact routes it was proven
   against.
-- Compiler phase: a trajectory can reach `done` with correct-looking
-  outputs that were never actually verified by a successful `extract`
-  call (the model can just restate what it read in its own observation
-  text after an `extract` fails — seen in the first live discovery run,
-  see BUILD_LOG.md). The compiler needs a policy: outputs without a
-  clean, verified extract step probably shouldn't become an artifact
-  `extract` step at all.
 - Whether to fall back to self-hosted Apache Fineract/Mifos as target app
   if the custom app's scope grows too large (see Target application above).

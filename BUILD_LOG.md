@@ -157,39 +157,125 @@ resolution for `click`/`type`/`extract` all return a clean, specific
 `navigate` is blocked and a `click` that triggers off-allowlist
 navigation is detected, reverted, and reported.
 
-**Live-run verification:** ran a genuine Claude Sonnet 5 discovery
-session against the live target_app — goal "Search for member 10001 and
-read their name and current savings balance", entry point
-`http://localhost:8000/members`. Completed in 5 steps: `type` member ID
--> `click` Search -> `click` the 10001 link -> `extract` (failed, see
-below) -> `done` with `{"member_id": "10001", "member_name": "Jane Doe",
-"savings_balance": "$4521.10"}`, all correct. Full trajectory and
-per-step screenshots saved to
-`evidence/runs/discover_20260816T014624Z_c5f7c6/`.
+**Four live Claude Sonnet 5 runs, same goal** ("Search for member 10001
+and read their name and current savings balance", entry point
+`http://localhost:8000/members`) **— three superseded, one canonical:**
 
-**Finding, not a bug:** step 4's `extract(role="cell", name="Jane Doe")`
-came back `ok: false` — "3 elements matched". Real ambiguity, not a
-false positive: target_app's nested-table layout gives outer wrapper
-cells a compound accessible name that concatenates all their descendant
-text (e.g. `cell "Member Detail Name: Jane Doe Savings Balance:
-$4521.10"`), so a substring match on "Jane Doe" hits that wrapper cell,
-a second nested wrapper, and the actual leaf value cell — three
-legitimate matches. The match-integrity guard did exactly its job. What's
-notable: the model didn't retry with a more specific selector — it just
-called `done` with the value it had already read from its own
-observation text, un-reextracted. So `member_name` and `savings_balance`
-in `final_outputs` are the model's self-report, not independently
-Playwright-verified as originally intended for `extract`; `member_id`
-was never extracted either (it was never displayed as a distinct
-element — the model restated it from the goal). Worth carrying into the
-compiler phase: a trajectory can reach `done` with correct outputs even
-when the outputs were never cleanly, verifiably extracted — the compiler
-needs a policy for this (e.g. treat unverified `done` outputs as
-insufficient to build a replay `extract` step from, and either retry
-discovery or require a clean extract).
+**Run 1 (`discover_20260816T014624Z_c5f7c6`, superseded) — found the
+self-report bypass.** `done`'s original tool schema took `outputs`
+directly. Step 4's `extract(role="cell", name="Jane Doe")` correctly
+came back `ok: false` ("3 elements matched" — a real ambiguity, not a
+false positive: this app's nested-table layout gives outer wrapper
+cells a compound accessible name that concatenates all descendant text,
+e.g. `cell "Member Detail Name: Jane Doe Savings Balance: $4521.10"`, so
+a substring match on "Jane Doe" always also hits that wrapper and a
+second nested one). Rather than retrying, the model just called `done`
+with the values restated from its own observation text — bypassing
+`extract`'s ground-truth verification entirely, the exact failure mode
+that verification exists to prevent. Its evidence directory was later
+cleared as routine local test cleanup; the run is preserved here in
+prose only, not as retained files.
 
-**Bugs found & fixed:** see the standalone entry above (`check_route`
-origin gap) — found and fixed during this phase but logged separately
-since it's a security finding, not a discovery-agent-specific note.
+**Fix 1:** `done`'s schema no longer accepts output values — only
+`output_names` referencing outputs already captured via a *successful*
+`extract` call, plus `summary`. The executor resolves real values from
+what `extract` verified, keyed by name; referencing an unextracted name
+comes back as `ok: false` with a clear detail, same pattern as
+zero/ambiguous-match errors, telling the model to extract it first.
+
+**Runs 2 and 3 (`discover_20260816T054213Z_fcc91a`,
+`discover_20260816T055344Z_b19fee`, both superseded) — fix 1 confirmed
+correct but exposed a second, structural issue.** Both runs hit the same
+"Jane Doe"/"$4521.10" 3-way ambiguity on every attempt (`cell`, `row`,
+`table`, `rowgroup` — 9 and 8 failed extracts respectively) and, unable
+to bypass verification anymore, eventually settled for extracting an
+entire outer row as one merged string (`"Member Detail\nName:\tJane
+Doe\nSavings Balance:\t$4521.10"`) instead of two clean fields. This
+was reproducible across two independent runs, not model luck: verified
+directly that `page.get_by_role("cell", name="Jane Doe")` (Playwright's
+default substring matching) matches 3 elements on the real detail page,
+while `exact=True` matches exactly 1. Every leaf cell's exact name is
+necessarily a substring of its ancestor wrapper cells' concatenated
+names in this markup, so substring matching made every leaf value
+structurally ambiguous against its own wrappers — no amount of
+model-side retrying could fix it.
+
+**Fix 2:** `discovery_tools.py`'s `_resolve_unique` (used by
+click/type/extract) now resolves with `exact=True`. Also applied to
+`agent/locators.py`'s `name`-based accessibility strategy (replay), for
+a reason beyond this bug: the compiler will translate discovery's
+now-exact-matched `extract(role, name)` calls into artifact locators,
+and if replay resolved `name` with different matching semantics than
+what discovery actually verified against, a compiled capability could
+behave differently at replay time than what discovery proved — a
+determinism gap. Replay's full test matrix (10001/99999/10002) re-run
+and confirmed unaffected by the change.
+
+**Run 4 (`discover_20260816T055902Z_5643e2`, canonical) — clean.** 6
+steps, no failures: `type` -> `click` Search -> `click` 10001 ->
+`extract(role="cell", name="Jane Doe")` -> `extract(role="cell",
+name="$4521.10")` -> `done(output_names=["member_name",
+"savings_balance"])`. Both outputs independently Playwright-verified,
+zero ambiguity, zero retries. Full trajectory, JSONL log, and per-step
+screenshots retained at `evidence/runs/discover_20260816T055902Z_5643e2/`
+— this is the canonical discovery evidence going forward; runs 1–3 are
+historical record only.
+
+**Bugs found & fixed:** the `check_route` origin gap (see the standalone
+entry above), the `done` self-report bypass, and the substring-match
+ambiguity — all three found and fixed during this phase, the first
+logged separately since it's a security finding rather than a
+discovery-agent-specific one.
+
+**Committed:** pending.
+
+---
+
+## 2026-08-16 — Artifact compiler build
+
+**Built:** `agent/compiler.py` (`compile_trajectory`), `agent/policy.py`
+(`PolicySpec` — the four policy fields plus capability_id/description/
+version, `extra="ignore"` so a full `Capability` JSON can be passed
+directly as `--policy`), `agent/compile.py` (CLI), plus a `templatize()`
+helper added to `agent/template.py` (inverse of `substitute` — turns a
+literal value back into `{{param_name}}`). Merges a discovery
+`Trajectory` (mechanical layer: steps, locators, checkpoints, inputs,
+outputs, target) with an authored `PolicySpec` (policy layer:
+expected_outcomes, guardrails, escalation_policy, risk_class) into a
+final `Capability`. Locators only ever get `accessibility` + `text_label`
+strategies — no `css` fallback is synthesized, since that would mean
+re-walking the live DOM at compile time rather than only emitting what
+discovery actually verified (documented as a Cuts item in CLAUDE.md).
+Checkpoints are derived mechanically: step *i*'s checkpoint checks
+visibility of whatever the very next successful action in the raw
+trajectory acted on; the final (merged extract) step gets
+`outputs_non_empty`.
+
+**Compiled and verified:** `evidence/runs/discover_20260816T055902Z_5643e2/trajectory.json`
++ `schema/example_artifact.json` as `--policy` + `--param member_id=10001`
+-> `schema/member_balance_lookup.compiled.json`. Replayed against all
+four seeded cases: `10001` succeeds with correct outputs, `10002` and
+`99999` correctly resolve as `ACCESS_DENIED`/`MEMBER_NOT_FOUND` business
+outcomes (not errors), `10004` escalates and pauses at step 3 — same
+step, same trigger, same operator-console display as the hand-authored
+artifact — and a resume via the actual operator console HTTP endpoint
+correctly re-checks rather than crashing.
+
+**Bug found and fixed mid-verification:** the first compile run "succeeded"
+structurally but `10002`/`99999` replays hung forever, blocked on an
+escalation nobody was there to resume. Root cause: step 2's mechanically
+derived checkpoint (`element_visible` on the results link) has no way to
+recognize `ACCESS_DENIED`/`MEMBER_NOT_FOUND` as legitimate outcomes,
+because a single successful trajectory never observes them — so the
+compiled artifact's `expected_outcomes` and its `steps` were both present
+but never actually wired together. Fixed by wrapping every non-final
+`element_visible` checkpoint in `any_of: [element_visible(...),
+outcome_match(<all policy-declared outcome codes>)]` — referencing only
+codes policy already declares, not inventing anything, so it stays
+"mechanical, no guessing" while actually making the two layers work
+together. Re-verified against the full four-case matrix above. Also
+found two long-dead `agent.replay` processes from hours-earlier manual
+escalation testing still running/blocked in the background — killed,
+unrelated to this bug.
 
 **Committed:** pending.

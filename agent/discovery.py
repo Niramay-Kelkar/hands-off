@@ -35,8 +35,11 @@ reason only from this text.
 
 You must call exactly one tool every turn. Available actions: click, type, navigate, \
 extract. Use extract to record any value the goal asks you to read, with a clear \
-output_name. When the goal has been fully achieved, call done with the outputs you \
-extracted and a short summary.
+output_name — extract independently re-reads the value from the live page, so it will \
+fail if your role/name don't uniquely identify one element. When the goal has been \
+fully achieved, call done with the output_names of everything you extracted (not the \
+values themselves) and a short summary. Do not call done referencing an output you \
+have not successfully extracted yet — extract it first.
 
 If a tool call fails — element not found, an ambiguous match, or blocked by guardrails \
 — you will get a specific explanation in the result. Adjust your next tool call \

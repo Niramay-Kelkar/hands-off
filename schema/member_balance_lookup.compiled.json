@@ -1,0 +1,295 @@
+{
+  "schema_version": "1.0",
+  "capability_id": "member_balance_lookup",
+  "version": 1,
+  "description": "Search for a member by ID and read their current savings balance.",
+  "created_at": "2026-08-16T07:09:48.456545Z",
+  "created_by": "agent.compile",
+  "source_run_id": "discover_20260816T055902Z_5643e2",
+  "target": {
+    "app": "localhost:8000",
+    "entry_point": "http://localhost:8000/members",
+    "surface_type": "web_legacy"
+  },
+  "risk_class": "read_only",
+  "inputs": [
+    {
+      "name": "member_id",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'member_id' (from discovery run discover_20260816T055902Z_5643e2)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "member_name",
+      "type": "string",
+      "description": "Value captured via extract as 'member_name'"
+    },
+    {
+      "name": "savings_balance",
+      "type": "money",
+      "description": "Value captured via extract as 'savings_balance'"
+    }
+  ],
+  "expected_outcomes": [
+    {
+      "code": "MEMBER_NOT_FOUND",
+      "description": "No member exists with the given ID",
+      "detection": {
+        "type": "text_present",
+        "conditions": null,
+        "value": "No records found",
+        "scope": "results_region"
+      }
+    },
+    {
+      "code": "ACCESS_DENIED",
+      "description": "Current operator lacks permission to view this member",
+      "detection": {
+        "type": "text_present",
+        "conditions": null,
+        "value": "You do not have permission",
+        "scope": "page"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "step_id": 1,
+      "description": "Type into role='textbox' name='Member ID'",
+      "action": {
+        "type": "type",
+        "value": "{{member_id}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "textbox",
+            "name": "Member ID"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Member ID"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "button",
+            "name": "Search"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "MEMBER_NOT_FOUND",
+              "ACCESS_DENIED"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 2,
+      "description": "Click role='button' name='Search'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "button",
+            "name": "Search"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Search"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "link",
+            "name": "{{member_id}}"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "MEMBER_NOT_FOUND",
+              "ACCESS_DENIED"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 3,
+      "description": "Click role='link' name='{{member_id}}'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "link",
+            "name": "{{member_id}}"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "{{member_id}}"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "cell",
+            "name": "Jane Doe"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "MEMBER_NOT_FOUND",
+              "ACCESS_DENIED"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 4,
+      "description": "Read final outputs",
+      "action": {
+        "type": "extract",
+        "value": null,
+        "fields": [
+          {
+            "output": "member_name",
+            "locator": {
+              "strategies": [
+                {
+                  "kind": "accessibility",
+                  "priority": 1,
+                  "role": "cell",
+                  "name": "Jane Doe"
+                },
+                {
+                  "kind": "text_label",
+                  "priority": 2,
+                  "label": "Jane Doe"
+                }
+              ]
+            }
+          },
+          {
+            "output": "savings_balance",
+            "locator": {
+              "strategies": [
+                {
+                  "kind": "accessibility",
+                  "priority": 1,
+                  "role": "cell",
+                  "name": "$4521.10"
+                },
+                {
+                  "kind": "text_label",
+                  "priority": 2,
+                  "label": "$4521.10"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "locator": null,
+      "wait": null,
+      "checkpoint": {
+        "type": "outputs_non_empty",
+        "conditions": null,
+        "fields": [
+          "member_name",
+          "savings_balance"
+        ]
+      },
+      "escalation_override": null
+    }
+  ],
+  "guardrails": {
+    "allowlist_routes": [
+      "/members",
+      "/members/*"
+    ],
+    "allowed_action_types": [
+      "type",
+      "click",
+      "extract"
+    ],
+    "requires_confirmation": false
+  },
+  "evidence_policy": {
+    "screenshot_on": [
+      "checkpoint_failure",
+      "hard_failure"
+    ],
+    "redact_fields": [
+      "ssn",
+      "account_number",
+      "password"
+    ]
+  },
+  "escalation_policy": {
+    "default": {
+      "on_checkpoint_failure": {
+        "retry": 2,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_step_timeout": {
+        "retry": 1,
+        "then": "escalate"
+      },
+      "on_hard_failure": {
+        "retry": 0,
+        "then": "escalate"
+      }
+    }
+  }
+}
