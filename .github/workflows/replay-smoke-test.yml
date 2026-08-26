@@ -35,6 +35,20 @@ jobs:
       - name: Seed target_app database
         run: python -m target_app.seed
 
+      # operator_console runs as root inside its container (no USER in
+      # Dockerfile); if it's the first process to touch the bind-mounted
+      # evidence/sessions/sessions.db (e.g. via the health-check curl in
+      # the next step, through escalation.latest_paused_run()), it creates
+      # that file as root on the host. agent.replay then runs on the host
+      # as the non-root runner user and can't write to it. Pre-creating
+      # the store here, host-owned and world-writable, means whichever
+      # side opens it first, both can still write. See BUILD_LOG.md.
+      - name: Pre-create shared session store
+        run: |
+          mkdir -p evidence/sessions
+          touch evidence/sessions/sessions.db
+          chmod -R 0777 evidence/sessions
+
       - name: Start target_app + operator_console
         run: docker compose up -d --build target_app operator_console
 

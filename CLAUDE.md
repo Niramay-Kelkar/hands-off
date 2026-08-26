@@ -567,9 +567,11 @@ own "don't reward feature breadth" grading note.
 
 Job: checkout, Python 3.11 (matches `Dockerfile`/README, no matrix),
 `pip install -r requirements.txt`, `playwright install --with-deps
-chromium`, seed `target_app`'s DB, `docker compose up -d --build
-target_app operator_console` (the existing compose file, unchanged —
-no new service added for CI), wait for both to answer, then:
+chromium`, seed `target_app`'s DB, pre-create the shared
+`evidence/sessions/sessions.db` session store (see below), `docker
+compose up -d --build target_app operator_console` (the existing
+compose file, unchanged — no new service added for CI), wait for both
+to answer, then:
 
 - `10001` → `status: "success"`, correct outputs — asserted by parsing
   the CLI's existing JSON stdout, not screen-scraping.
@@ -587,6 +589,24 @@ on `hard_failure`, `0` on `success`/`business_outcome`
 structurally. No change was made to `replay.py`; the ask was to avoid
 screen-scraping, not to add flags preemptively where the existing
 contract already suffices.
+
+**Pre-creating the session store is load-bearing, found on the actual
+first GitHub Actions run, not in local verification.**
+`operator_console` runs as root inside its container (no `USER` in
+`Dockerfile`); the "wait for services" health-check is the first thing
+to touch the bind-mounted `evidence/sessions/sessions.db` (through
+`escalation.latest_paused_run()`), which creates it root-owned on the
+host. `agent.replay` then runs on the host as the CI runner's non-root
+user and can't write to it —
+`sqlite3.OperationalError: attempt to write a readonly database` out of
+`agent/escalation.py::open_session`. Docker Desktop on macOS remaps
+container UIDs transparently on a bind mount, so this never showed up
+locally; a native Linux Docker host does not. Fixed with a step before
+`docker compose up`: `mkdir -p evidence/sessions && touch
+evidence/sessions/sessions.db && chmod -R 0777 evidence/sessions` — the
+file exists, host-owned and world-writable, before either side opens
+it, so it no longer matters which process gets there first. See
+BUILD_LOG.md 2026-08-26 for the failure transcript.
 
 **The `10004` escalation check is real automation of the human
 handoff, not a mocked one.** `.github/scripts/check_escalation_lifecycle.py`

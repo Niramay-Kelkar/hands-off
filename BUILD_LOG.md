@@ -1034,4 +1034,42 @@ from the new `.github/` files).
 **Documentation:** CLAUDE.md gained a "CI: replay smoke test" section.
 README.md gained a status badge at the top, pointed at this workflow.
 
+**Committed:** `74de2f2`.
+
+**Failed on its actual first GitHub Actions run** (pushed by the user
+right after the commit above), with `sqlite3.OperationalError: attempt
+to write a readonly database` out of `agent/escalation.py`'s
+`open_session()`. Root cause: `operator_console` runs as root inside
+its container (no `USER` in `Dockerfile`); the "wait for services"
+step's health-check `curl` to `:8100/` is the first thing to touch the
+bind-mounted `evidence/sessions/sessions.db` — through
+`escalation.latest_paused_run()` — so the file gets created root-owned
+on the host. `agent.replay` then runs on the *host* as the CI runner's
+non-root user and can't write to it. This never surfaced in local
+verification because Docker Desktop on macOS remaps container UIDs
+transparently on a bind mount; a native Linux Docker host (GitHub
+Actions' runner) doesn't — exactly the kind of environment-specific gap
+this workflow exists to catch, just caught one step later than ideal
+(on the real run instead of local verification, because local
+verification structurally couldn't have caught it).
+
+**Fix:** a new step, "Pre-create shared session store," runs before
+`docker compose up` — `mkdir -p evidence/sessions && touch
+evidence/sessions/sessions.db && chmod -R 0777 evidence/sessions`. The
+file already exists, host-owned and world-writable, before either the
+container or the host-side `agent.replay` process ever opens it, so
+whichever side gets there first no longer matters.
+`evidence/sessions/sessions.db` holds only run bookkeeping (`run_id`,
+`status`, `current_step_id`, `pause_reason`, `screenshot_path`,
+`updated_at`) — no extracted business data or PII — so a permissive
+mode on this specific, gitignored, ephemeral directory doesn't
+reintroduce the class of risk `evidence_policy.redact_fields` and the
+mask-on-screenshot mechanism exist to prevent.
+
+Re-verified the full four-check sequence locally with the fix in place
+(same commands the workflow runs) — all four still pass. The
+UID-mismatch failure mode itself can't be reproduced on macOS for the
+reason above, so the actual proof this fix works is the next GitHub
+Actions run, not local verification.
+
 **Committed:** pending.
