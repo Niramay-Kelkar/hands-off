@@ -897,3 +897,65 @@ checkpoint/outcome/escalation lifecycle does too, with zero changes to
 the artifact or the escalation mechanism itself.
 
 **Committed:** pending.
+
+## 2026-08-26 — Confidence & approval gate (stretch goal, tightly scoped)
+
+**Built**: `agent/approval.py` — `approval_status(capability_id)` reads
+`schema/capabilities/<capability_id>.approval.json`
+(`{"status": "draft"|"approved", "approved_by": null, "approved_at": null}`),
+defaulting to `"draft"` on a missing file, a parse failure, or any
+`status` value other than the literal string `"approved"` — fail closed
+in every failure mode, not just the happy "file exists and says draft"
+case. `agent/capability_api.py`'s `POST /invoke` calls `is_approved()`
+right after the 404 check and before `run_capability()`, returning
+`403` with a message naming the exact file to edit. `agent/replay.py`
+gained `--update-confidence`: reuses `_run_stability()`'s existing
+aggregation (success rate as `(N - hard_failures) / N`, `by_status`,
+`by_outcome_code`, duration min/max/avg) unchanged, only adding a
+`Path.write_text()` of that same data to
+`<capability_id>.confidence.json`. `--update-confidence` alone (without
+an explicit `--repeat`) still routes through the stability path so a
+single-run confidence file can be produced deliberately, rather than
+only mattering when combined with a large `--repeat`.
+
+**Deliberate scope boundary**: `agent.replay`'s CLI is not gated by
+approval status at all — only `capability_api`'s `/invoke` checks it.
+The brief's own phrasing is "gate unattended replay"; a person running
+`agent.replay` directly from a terminal already is the human in the
+loop, so gating that path would be gating something that isn't actually
+unattended. The gate exists for the one path in this system where an
+agent could invoke a capability with nobody watching.
+
+**Verified live**, both directions, against `member_balance_lookup`
+(`target_app` on 8000, `agent.capability_api` on 8200, headless via
+`CAPABILITY_API_HEADED=false`):
+
+1. Created `member_balance_lookup.approval.json` with `status: "draft"`
+   (the file didn't exist before this session). `POST /invoke
+   {"member_id": "10001"}` → `403`, error message names the approval
+   file. Saved as `evidence/capability_api/invoke_10001_draft_403.json`.
+2. Flipped the file to `status: "approved"`. Same invoke → `200`,
+   `{"status": "success", "outputs": {"member_name": "Jane Doe",
+   "savings_balance": 4521.1}}`. Saved as
+   `evidence/capability_api/invoke_10001_approved_200.json`.
+3. Flipped back to `"draft"` and confirmed `agent.replay` (the CLI, not
+   the API) against the same capability still succeeds — the gate has
+   zero effect on that path, exactly as designed — then re-confirmed
+   the API immediately re-blocks with `403` in that same draft state,
+   before restoring the file to `"approved"` as this session's final
+   state.
+
+**Ran `--update-confidence` for real**, not fabricated: 5 headless runs
+of `member_balance_lookup` against `member_id=10001` — `5/5 success`,
+durations 5.58s–5.85s (avg 5.69s), written to
+`schema/capabilities/member_balance_lookup.confidence.json`.
+
+**Documentation**: CLAUDE.md gained a "Stretch goal: confidence &
+approval gate" section (and the capability API section's heading no
+longer claims to be "the only stretch goal taken on," since it isn't
+anymore); REPORT.md's Safety section (6) gained one paragraph stating
+the mechanism and what was verified, sized to match how small the
+feature actually is relative to the other three safety mechanisms
+already documented there.
+
+**Committed:** pending.

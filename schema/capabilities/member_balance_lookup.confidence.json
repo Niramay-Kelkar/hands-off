@@ -1,0 +1,18 @@
+{
+  "capability_id": "member_balance_lookup",
+  "generated_at": "2026-08-26T15:52:10.904818+00:00",
+  "params": {
+    "member_id": "10001"
+  },
+  "sample_size": 5,
+  "success_rate": 1.0,
+  "by_status": {
+    "success": 5
+  },
+  "by_outcome_code": {},
+  "duration_seconds": {
+    "min": 5.580168507993221,
+    "max": 5.846212751988787,
+    "avg": 5.69482188259135
+  }
+}

@@ -23,6 +23,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request
 
+from agent.approval import is_approved
 from agent.engine import InputValidationError, run_capability
 from agent.models import Capability
 
@@ -75,6 +76,20 @@ def invoke_capability(capability_id: str):
     capability = catalog.get(capability_id)
     if capability is None:
         return jsonify({"error": f"no capability {capability_id!r} found under {CAPABILITIES_DIR}/"}), 404
+
+    if not is_approved(capability_id):
+        return (
+            jsonify(
+                {
+                    "error": (
+                        f"capability {capability_id!r} is not approved for unattended invocation "
+                        f"(status: draft). Approve it via schema/capabilities/{capability_id}.approval.json "
+                        "before invoking through this API."
+                    )
+                }
+            ),
+            403,
+        )
 
     params = request.get_json(silent=True)
     if params is None:

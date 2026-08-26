@@ -159,13 +159,22 @@ sliced eight ways.
 
 ## `capability_api/`
 
-Evidence for the one stretch goal taken on: the agent-facing HTTP
-interface (`agent/capability_api.py`). `catalog.json` is a real
-`GET /capabilities` response listing `member_balance_lookup` by scanning
-`schema/capabilities/`. `invoke_10001.json` and `invoke_10002.json` are
-real `POST /capabilities/member_balance_lookup/invoke` responses — the
+Evidence for the agent-facing HTTP interface (`agent/capability_api.py`).
+`catalog.json` is a real `GET /capabilities` response listing
+`member_balance_lookup` by scanning `schema/capabilities/`.
+`invoke_10001.json` and `invoke_10002.json` are real
+`POST /capabilities/member_balance_lookup/invoke` responses — the
 success and business-outcome cases — returned as the exact
 `ReplayResult` JSON body engine.py produces, no translation layer.
 Deliberately demonstration-scale: no auth, no queueing, one synchronous
 headed-browser run per invoke (see CLAUDE.md's Cuts notes and
 REPORT.md).
+
+`invoke_10001_draft_403.json` and `invoke_10001_approved_200.json` are
+the same invoke, same member, with only
+`schema/capabilities/member_balance_lookup.approval.json`'s `status`
+field changed between the two requests — proof the confidence &
+approval gate (`agent/approval.py`) actually blocks and unblocks the
+live `/invoke` route, not just that the code path exists. See
+CLAUDE.md's "Stretch goal: confidence & approval gate" section and
+REPORT.md Section 6.

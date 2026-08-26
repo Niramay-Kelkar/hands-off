@@ -429,7 +429,7 @@ artifact relies entirely on the policy's artifact-level default for
 every step, even ones a hand-authored artifact might override
 differently.
 
-## Stretch goal: agent-facing capability API — built (agent/), the only stretch goal taken on
+## Stretch goal: agent-facing capability API — built (agent/)
 
 `agent/capability_api.py` (Flask, port 8200, same pattern as
 `operator_console.py`) — `GET /capabilities` scans `schema/capabilities/`
@@ -441,7 +441,8 @@ for each. `POST /capabilities/<id>/invoke` takes a flat JSON params
 object, calls `engine.run_capability()` unchanged, and returns the exact
 `ReplayResult` JSON body with no translation layer — `200` for
 `success`/`business_outcome`, `500` for `hard_failure`, `400`/`404` for
-bad input / unknown capability.
+bad input / unknown capability, `403` if the capability isn't approved
+for unattended invocation (see Confidence & approval gate below).
 
 **Demonstration-scale only, deliberately**: no auth, no queueing, one
 synchronous browser run per invoke, no rate limiting. The brief
@@ -469,6 +470,47 @@ and `operator_console` (see Containerization below).
 `schema/capabilities/` is now the conventional home for compiled
 artifacts meant to be served/invoked — `agent/compile.py --out` should
 target it going forward.
+
+## Stretch goal: confidence & approval gate — built (agent/), tightly scoped
+
+`agent/approval.py` — `<capability_id>.approval.json`
+(`{"status": "draft"|"approved", "approved_by": null, "approved_at": null}`)
+next to a capability's compiled artifact in `schema/capabilities/`. A
+missing file, or one that fails to parse, or one whose `status` isn't
+literally `"approved"`, all resolve to `"draft"` — fail closed, never
+fail open. `capability_api.py`'s `POST /invoke` checks this immediately
+after confirming the capability exists and *before* calling
+`run_capability()`, returning `403` with a message naming the file to
+edit. `agent.replay`'s CLI is deliberately **not** gated by this — the
+brief's own phrasing is "gate unattended replay," and a person running
+`agent.replay` from a terminal already is the human in the loop; the
+gate exists specifically for the one path where an agent could invoke a
+capability with nobody watching. Verified live against
+`member_balance_lookup`: invoke returns `403` while its approval file
+says `"draft"` (the default, unedited state), and `200` with correct
+outputs once flipped to `"approved"` — both request/response pairs
+saved at `evidence/capability_api/invoke_10001_draft_403.json` and
+`invoke_10001_approved_200.json`. Also verified the CLI ignores this
+entirely: `agent.replay` against the same capability succeeds while its
+approval file is `"draft"`.
+
+`agent/replay.py --repeat N --update-confidence` reuses `--repeat`'s
+existing aggregation (success rate, per-status and per-outcome-code
+breakdown, duration stats) unchanged — the only addition is persisting
+it to `<capability_id>.confidence.json` instead of only printing it, so
+an approval decision has real, dated evidence to point at rather than
+being a bare status flip. `--update-confidence` alone (without an
+explicit `--repeat`) still routes through the stability path so a
+single-run confidence file can be produced deliberately. Ran once for
+real against `member_balance_lookup` (5 runs, headless): 5/5 success,
+written to `schema/capabilities/member_balance_lookup.confidence.json`.
+
+**Contained on purpose**: no UI, no auth beyond what `capability_api`
+already has (none), no versioned approval history — a flipped
+`approval.json` simply overwrites the prior state. A production version
+would want an audit trail (who approved what, when, against which
+confidence snapshot) rather than a single mutable file; out of scope
+here, same reasoning as everything else in this stretch-goal section.
 
 ## Containerization — built (target_app + operator_console only)
 

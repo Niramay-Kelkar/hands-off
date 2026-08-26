@@ -13,9 +13,13 @@ import json
 import sys
 import time
 from collections import Counter
+from datetime import datetime, timezone
+from pathlib import Path
 
 from agent.engine import InputValidationError, run_capability
 from agent.models import Capability
+
+CAPABILITIES_DIR = Path("schema/capabilities")
 
 
 def _parse_input(raw: str) -> tuple[str, str]:
@@ -32,7 +36,13 @@ def _run_once(artifact: Capability, params: dict[str, str], headed: bool):
     return result, duration
 
 
-def _run_stability(artifact: Capability, params: dict[str, str], headed: bool, repeat: int) -> int:
+def _confidence_path(capability_id: str) -> Path:
+    return CAPABILITIES_DIR / f"{capability_id}.confidence.json"
+
+
+def _run_stability(
+    artifact: Capability, params: dict[str, str], headed: bool, repeat: int, *, update_confidence: bool = False
+) -> int:
     status_counts: Counter = Counter()
     outcome_counts: Counter = Counter()
     durations: list[float] = []
@@ -64,6 +74,30 @@ def _run_stability(artifact: Capability, params: dict[str, str], headed: bool, r
         f"avg={sum(durations) / len(durations):.2f}s"
     )
 
+    if update_confidence:
+        path = _confidence_path(artifact.capability_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "capability_id": artifact.capability_id,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "params": params,
+                    "sample_size": repeat,
+                    "success_rate": (repeat - status_counts["hard_failure"]) / repeat,
+                    "by_status": dict(status_counts),
+                    "by_outcome_code": dict(outcome_counts),
+                    "duration_seconds": {
+                        "min": min(durations),
+                        "max": max(durations),
+                        "avg": sum(durations) / len(durations),
+                    },
+                },
+                indent=2,
+            )
+        )
+        print(f"\nconfidence stats written to {path}")
+
     return 0 if status_counts["hard_failure"] == 0 else 1
 
 
@@ -80,6 +114,14 @@ def main(argv: list[str] | None = None) -> int:
         default=1,
         help="run the same capability + params N times and report a stability summary (default 1, i.e. current behavior)",
     )
+    parser.add_argument(
+        "--update-confidence",
+        action="store_true",
+        help=(
+            "persist the --repeat stability summary to "
+            "schema/capabilities/<capability_id>.confidence.json (implies the --repeat flow even with --repeat 1)"
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.repeat < 1:
@@ -90,12 +132,14 @@ def main(argv: list[str] | None = None) -> int:
     params = dict(args.inputs)
 
     try:
-        if args.repeat == 1:
+        if args.repeat == 1 and not args.update_confidence:
             result, _ = _run_once(artifact, params, headed=not args.headless)
             print(json.dumps(result.model_dump(), indent=2, default=str))
             return {"success": 0, "business_outcome": 0, "hard_failure": 1}[result.status]
 
-        return _run_stability(artifact, params, headed=not args.headless, repeat=args.repeat)
+        return _run_stability(
+            artifact, params, headed=not args.headless, repeat=args.repeat, update_confidence=args.update_confidence
+        )
     except InputValidationError as exc:
         print(f"input validation failed: {exc}", file=sys.stderr)
         return 2

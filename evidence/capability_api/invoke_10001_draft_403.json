@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "http://localhost:8200/capabilities/member_balance_lookup/invoke",
+    "body": {
+      "member_id": "10001"
+    }
+  },
+  "http_status": 403,
+  "response": {
+    "error": "capability 'member_balance_lookup' is not approved for unattended invocation (status: draft). Approve it via schema/capabilities/member_balance_lookup.approval.json before invoking through this API."
+  }
+}
