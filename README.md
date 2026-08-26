@@ -26,9 +26,13 @@ in [REPORT.md](./REPORT.md).
    repeatable. It detects and reports runtime conditions such as
    validation errors, "not found" results, and permission denials as
    distinct outcomes rather than crashes.
-4. **Escalate.** If the agent gets stuck during discovery, or replay hits
-   a condition it cannot recover from, control of the live session is
-   handed to a human operator, who can act and then hand control back.
+4. **Escalate.** If replay hits a condition it cannot recover from —
+   an unrecognized dialog, a checkpoint failure past its retry budget —
+   control of the live session is handed to a human operator, who can
+   act and then hand control back. Discovery does not currently
+   escalate: if a discovery run exhausts its step budget without
+   reaching the goal, it terminates with a distinct status instead of
+   pausing for a human (see REPORT.md Section 5).
 
 ## Setup
 
