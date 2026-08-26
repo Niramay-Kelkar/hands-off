@@ -87,6 +87,30 @@ wrong.
   proves the outcome. Account number is masked in both, consistent with
   `redaction/` below, even though these were captured outside the replay
   engine.
+- **`cross_tenant_b_escalation_20004/`** — the same escalation/handoff
+  proof as `escalation_10004/`, reproduced against tenant B with zero
+  changes to the artifact or the escalation mechanism. `target_app_tenant_b`
+  gained a `20004` fixture ID mirroring `target_app`'s `10004` exactly
+  (fabricated search result, in-page `role="dialog"` modal at the detail
+  step); the same untouched `member_balance_lookup.compiled.json` was
+  replayed against it. `log.jsonl` shows the identical trigger sequence
+  (`unrecognized_dialog` -> `escalate`, `trigger: "on_unrecognized_dialog"`
+  -> `escalation_resumed` -> `run_end`, `status: "success"`),
+  `screenshots/step_3_on_unrecognized_dialog.png` is the engine's own
+  pause screenshot (redacted account number already visible, same as
+  tenant A's), `operator_console_pause.jpg` is the real operator console
+  mid-pause for this run, and `result.json` shows the completed
+  extraction (`member_name: "Marcus Webb"`). The dismissal itself used
+  the same method as tenant A's original verification: a second
+  Playwright process attached to the SAME live browser over CDP
+  (`AGENT_CDP_PORT`, a small opt-in seam added to `agent/engine.py` for
+  exactly this — see BUILD_LOG.md) to click "Continue," standing in for
+  a human, followed by a real `POST /resume/<run_id>` against a live
+  `agent.operator_console` process. This is the stronger cross-tenant
+  result: not just locator targeting (the earlier `cross_tenant_b_*`
+  evidence), but the full checkpoint/outcome/escalation lifecycle
+  generalizing to a second tenant with no changes anywhere.
+
 ## `redaction/`
 
 Proof that `evidence_policy.redact_fields` is enforced against a real

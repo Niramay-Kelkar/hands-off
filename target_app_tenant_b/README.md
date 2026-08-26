@@ -37,10 +37,7 @@ locates keeps the exact same accessible role + name:
 
 ## What's deliberately NOT built here
 
-No app-layer fault injection (no slow-load/interstitial IDs) — this
-fixture only needs a happy path and a not-found case to test locator
-resilience against styling/markup drift. Out of scope for this pass;
-see CLAUDE.md.
+No slow-load ID — out of scope for this pass; see CLAUDE.md.
 
 ## Run it
 
@@ -65,13 +62,16 @@ test does this.
 
 ## Seeded member IDs
 
-| Member ID | Behavior |
-|---|---|
-| `20001` | Happy path: Alice Nguyen, $8390.55 |
-| any other ID (e.g. `29999`) | Genuine `SELECT` returns zero rows -> "No records found" (`MEMBER_NOT_FOUND`) |
+| Member ID | Source | Behavior | Maps to |
+|---|---|---|---|
+| `20001` | DB row | Happy path: Alice Nguyen, $8390.55 | happy path |
+| `20004` | Not in DB — app-layer only, fixture data in `server.py`, mirrors `target_app`'s `10004` exactly | Search results show a fabricated row; clicking into detail renders an unexpected in-page modal (`role="dialog"`, `aria-label="Notice"`) that must be dismissed before the underlying content is usable | recoverable/escalation trigger — `on_unrecognized_dialog` |
+| any other ID (e.g. `29999`) | Genuine `SELECT` returns zero rows | "No records found" | `MEMBER_NOT_FOUND` business outcome |
 
-## Result of the cross-tenant replay test
+## Result of the cross-tenant replay tests
 
 See the root `REPORT.md` Heterogeneity section and `BUILD_LOG.md` for
-the actual result of replaying `member_balance_lookup.compiled.json`
-against `20001` here, unmodified.
+the actual results of replaying `member_balance_lookup.compiled.json`
+against `20001`, `29999`, and `20004` here, unmodified — including the
+full checkpoint/outcome/escalation lifecycle, not just locator
+targeting.

@@ -32,6 +32,7 @@ Each step is split into three phases with separate retry handling:
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Callable
 
@@ -92,7 +93,16 @@ def run_capability(artifact: Capability, raw_params: dict[str, str], *, headed: 
     allowed_origin = guardrails.derive_origin(artifact.target.entry_point)
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=not headed)
+        # AGENT_CDP_PORT (unset by default, no behavior change): exposes this
+        # run's browser over CDP on a fixed port so a second Playwright
+        # process can attach to the SAME live browser — the mechanism a
+        # human operator's escalation ultimately relies on, driven here
+        # programmatically for evidence capture. See BUILD_LOG.md.
+        launch_args = []
+        cdp_port = os.environ.get("AGENT_CDP_PORT")
+        if cdp_port:
+            launch_args.append(f"--remote-debugging-port={cdp_port}")
+        browser = pw.chromium.launch(headless=not headed, args=launch_args)
         page = browser.new_page()
         log.attach_page(page)
         ctx = RunContext(

@@ -823,3 +823,77 @@ for the new port and the artifact-copy mechanism.
 
 **Committed:** pending.
 
+## 2026-08-26 — Cross-tenant reuse, extended: the full escalation lifecycle, not just locator targeting
+
+The prior cross-tenant round proved locator resilience (happy path +
+not-found) but left the escalation/handoff mechanism — arguably the
+more load-bearing half of the system, per the brief's own weighting —
+untested against a second tenant. Closed that gap with one new seeded
+ID, reusing tenant A's interstitial pattern and CDP-attach verification
+method directly rather than designing anything new.
+
+**What was built**: `target_app_tenant_b/server.py` gained
+`INTERSTITIAL_ID = "20004"` and `INTERSTITIAL_FIXTURE` (Marcus Webb,
+$3175.20), a line-for-line mirror of `target_app`'s `10004`/
+`INTERSTITIAL_FIXTURE` pattern — fabricated search result and detail
+record, never touching `members_b.db`. `templates/detail.html` gained
+the same modal block tenant A's `detail.html` has
+(`role="dialog" aria-modal="true" aria-label="Notice"`, a "Continue"
+button that hides the overlay), styled with new `cu-modal*` classes in
+`cu.css` for visual consistency with the rest of tenant B's branding.
+`agent/engine.py`'s dialog detection (`_has_unexpected_dialog`, any
+visible `role="dialog"`/`"alertdialog"`) needed zero changes — it was
+already generic, not tied to tenant A's specific markup or text.
+
+**Constraint discovered while wiring up the reproduction**: BUILD_LOG's
+own 2026-08-15 entry describes the original escalation proof as
+"attaching a second Playwright process to the *same* live browser over
+CDP," but that script was never committed — `agent/engine.py` launched
+Chromium with no `--remote-debugging-port`, so there was nothing for an
+external process to attach to. Rather than reinvent the verification
+method, added the minimal seam needed to actually reuse it: `AGENT_CDP_PORT`
+(unset by default, zero behavior change), read once in
+`run_capability()` and passed as `--remote-debugging-port=<port>` to
+`pw.chromium.launch()` — same spirit as the existing `CAPABILITY_API_HEADED`
+seam.
+
+**Test**: tenant A (8000), tenant B (8001), and `agent.operator_console`
+(8100) all running concurrently. A driver script set `AGENT_CDP_PORT=9223`,
+ran `run_capability()` in a background thread (headed, the port-8001
+copy of `member_balance_lookup.compiled.json`, `member_id=20004`),
+polled `agent.escalation` for a newly-paused run (had to exclude
+pre-existing stale paused rows in `sessions.db` from earlier sessions —
+`latest_paused_run()` returns whatever's most recently updated
+system-wide, not scoped to this run), confirmed `pause_reason ==
+"on_unrecognized_dialog"`, screenshotted the live `operator_console`
+view of the pause, connected a second Playwright process via
+`connect_over_cdp("http://localhost:9223")` to the SAME browser and
+clicked "Continue" (standing in for a human — the identical technique
+from the original 2026-08-15 verification), then issued a real
+`POST http://localhost:8100/resume/<run_id>` via `urllib.request` (no
+new dependency) against the live operator console process, not an
+in-process call.
+
+**Result: identical mechanism, identical outcome, different tenant.**
+`log.jsonl` for the new run shows the exact same event sequence as
+tenant A's `escalation_10004/`: `unrecognized_dialog` (step 3) ->
+`escalate`, `trigger: "on_unrecognized_dialog"` -> `escalation_resumed`
+-> `run_end`, `status: "success"`. Final result:
+`{"status": "success", "outputs": {"member_name": "Marcus Webb",
+"savings_balance": 3175.2}}`. The engine's own pause screenshot
+(`screenshots/step_3_on_unrecognized_dialog.png`) has the account number
+correctly redacted, same as every other escalation screenshot in this
+repo; spot-checked `log.jsonl` for the raw account number value —
+absent, as expected (never reached, since `extract` only ever runs for
+`member_name`/`savings_balance`).
+
+Evidence saved: `evidence/replays/cross_tenant_b_escalation_20004/`
+(`result.json`, `log.jsonl`, `operator_console_pause.jpg`,
+`screenshots/step_3_on_unrecognized_dialog.png`), same four-file shape
+as `evidence/replays/escalation_10004/`. `evidence/README.md` and
+REPORT.md's Heterogeneity section updated to state the stronger claim:
+not just locator targeting generalizes to a second tenant, but the full
+checkpoint/outcome/escalation lifecycle does too, with zero changes to
+the artifact or the escalation mechanism itself.
+
+**Committed:** pending.

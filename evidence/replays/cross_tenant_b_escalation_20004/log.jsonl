@@ -1,0 +1,19 @@
+{"ts": "2026-08-26T06:45:00.406911+00:00", "kind": "run_start", "capability_id": "member_balance_lookup", "version": 1, "params": {"member_id": "20004"}}
+{"ts": "2026-08-26T06:45:09.337945+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-26T06:45:09.357194+00:00", "kind": "action", "type": "type", "value": "20004"}
+{"ts": "2026-08-26T06:45:11.293248+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-26T06:45:11.304005+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-26T06:45:11.737594+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-26T06:45:12.759695+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-26T06:45:12.767516+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-26T06:45:13.075718+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-26T06:45:13.112265+00:00", "kind": "unrecognized_dialog", "step_id": 3}
+{"ts": "2026-08-26T06:45:14.012123+00:00", "kind": "escalate", "step_id": 3, "trigger": "on_unrecognized_dialog", "detail": "unexpected dialog visible", "screenshot": "evidence/runs/member_balance_lookup_20260826T064500Z_6f0724/screenshots/step_3_on_unrecognized_dialog.png"}
+{"ts": "2026-08-26T06:45:18.058765+00:00", "kind": "escalation_resumed", "step_id": 3}
+{"ts": "2026-08-26T06:45:19.093656+00:00", "kind": "checkpoint", "step_id": 3, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-26T06:45:19.118343+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-26T06:45:19.145471+00:00", "kind": "action", "type": "extract", "output": "member_name", "strategy_kind": "accessibility"}
+{"ts": "2026-08-26T06:45:19.168002+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-26T06:45:19.193739+00:00", "kind": "action", "type": "extract", "output": "savings_balance", "strategy_kind": "accessibility"}
+{"ts": "2026-08-26T06:45:20.227742+00:00", "kind": "checkpoint", "step_id": 4, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-26T06:45:20.253303+00:00", "kind": "run_end", "status": "success"}

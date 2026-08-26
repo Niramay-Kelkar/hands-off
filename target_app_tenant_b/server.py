@@ -10,9 +10,11 @@ to the member ID, cells "Name:" / "Savings Balance:") — that sameness is
 the control. Everything else (branding, CSS, DOM shape, class names) is
 deliberately different. See target_app_tenant_b/README.md.
 
-No app-layer fault injection here (no slow-load/interstitial IDs) — out
-of scope for this pass, only the happy path + a not-found case are
-seeded/tested.
+App-layer fault injection: one interstitial-dialog ID (`20004`),
+mirroring `target_app`'s `10004` pattern exactly — a fabricated search
+result and detail record (not a DB row), same in-page modal markup
+(`role="dialog"`, `aria-modal="true"`, `aria-label="Notice"`). Still no
+slow-load ID — out of scope for this pass.
 
 Binds to its own port, `TENANT_B_PORT` (default 8001) — separate from
 target_app's 8000 — so both apps can run concurrently. Because a
@@ -36,6 +38,19 @@ from target_app_tenant_b.db import get_member
 
 app = Flask(__name__)
 
+INTERSTITIAL_ID = "20004"
+# Fabricated on purpose, same as target_app's 10004: this ID has no row
+# in members_b.db. Its presence in search results and its detail content
+# are entirely synthetic, generated here rather than read from the
+# database, so the fault-injection path never touches genuine
+# business-outcome data.
+INTERSTITIAL_FIXTURE = {
+    "id": INTERSTITIAL_ID,
+    "name": "Marcus Webb",
+    "savings_balance": 3175.20,
+    "account_number": "7723910485",
+}
+
 
 @app.route("/members")
 def members_search():
@@ -45,18 +60,21 @@ def members_search():
     outcome = None  # None | "not_found" | "access_denied"
 
     if searched:
-        row = get_member(member_id)
-        if row is None:
-            outcome = "not_found"
-        elif row["access_denied"]:
-            outcome = "access_denied"
+        if member_id == INTERSTITIAL_ID:
+            result = INTERSTITIAL_FIXTURE
         else:
-            result = {
-                "id": row["id"],
-                "name": row["name"],
-                "savings_balance": row["savings_balance"],
-                "account_number": row["account_number"],
-            }
+            row = get_member(member_id)
+            if row is None:
+                outcome = "not_found"
+            elif row["access_denied"]:
+                outcome = "access_denied"
+            else:
+                result = {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "savings_balance": row["savings_balance"],
+                    "account_number": row["account_number"],
+                }
 
     return render_template(
         "search.html",
@@ -69,6 +87,11 @@ def members_search():
 
 @app.route("/members/<member_id>")
 def member_detail(member_id):
+    if member_id == INTERSTITIAL_ID:
+        return render_template(
+            "detail.html", member=INTERSTITIAL_FIXTURE, interstitial=True
+        )
+
     row = get_member(member_id)
     if row is None or row["access_denied"]:
         abort(404)
@@ -79,7 +102,7 @@ def member_detail(member_id):
         "savings_balance": row["savings_balance"],
         "account_number": row["account_number"],
     }
-    return render_template("detail.html", member=member)
+    return render_template("detail.html", member=member, interstitial=False)
 
 
 @app.route("/branch-notice")

@@ -10,4 +10,13 @@
     </tbody>
   </table>
 </section>
+
+{% if interstitial %}
+<div class="cu-modalOverlay">
+  <div class="cu-modalBox" role="dialog" aria-modal="true" aria-label="Notice">
+    <p>This record requires additional verification before it can be displayed. Please confirm to continue.</p>
+    <button type="button" class="cu-modalDismiss" onclick="document.querySelector('.cu-modalOverlay').style.display='none';">Continue</button>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
