@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
 
 from agent.locators import ResolvedLocator, resolve_locator
-from agent.models import ActionModel, Capability, get_field
+from agent.models import ActionModel, Capability
 from agent.registry import Registry
 from agent.template import substitute
 

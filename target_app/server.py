@@ -23,7 +23,7 @@ Run: python -m target_app.server  (serves http://localhost:8000)
 import os
 import time
 
-from flask import Flask, abort, render_template, request, url_for
+from flask import Flask, abort, render_template, request
 
 from target_app.db import get_member
 
