@@ -546,6 +546,78 @@ services. See BUILD_LOG.md 2026-08-16 ("Containerize target_app +
 operator_console") for the verification transcript, including why
 `capability_api` was deliberately left out.
 
+## CI: replay smoke test — built
+
+`.github/workflows/replay-smoke-test.yml`, triggered on both `push` to
+`main` and `pull_request` — deliberately both, since a `pull_request`
+trigger is what lets branch protection actually gate a merge on this
+check, not just report status on `main` after the fact.
+
+Scoped to exactly the deterministic half of the system:
+`agent.replay` against the already-compiled `member_balance_lookup`
+artifact, over the same tenant-A matrix used to verify hygiene passes
+by hand (`10001`/`10002`/`99999`/`10004`). Explicitly excluded, on
+purpose, not as a gap: discovery, compilation, anything requiring
+`ANTHROPIC_API_KEY`, a Python version matrix, parallel job splitting.
+This workflow exists to catch a regression in replay/escalation
+mechanics on every push and PR — it is not meant to be a full test
+suite, and padding it with LLM-dependent or infra-scaling checks would
+cost real CI minutes without adding signal proportionate to the brief's
+own "don't reward feature breadth" grading note.
+
+Job: checkout, Python 3.11 (matches `Dockerfile`/README, no matrix),
+`pip install -r requirements.txt`, `playwright install --with-deps
+chromium`, seed `target_app`'s DB, `docker compose up -d --build
+target_app operator_console` (the existing compose file, unchanged —
+no new service added for CI), wait for both to answer, then:
+
+- `10001` → `status: "success"`, correct outputs — asserted by parsing
+  the CLI's existing JSON stdout, not screen-scraping.
+- `10002` / `99999` → `status: "business_outcome"`, correct
+  `outcome_code` (`ACCESS_DENIED` / `MEMBER_NOT_FOUND`).
+- `10004` — the standout check, and the reason this workflow is worth
+  having beyond a basic smoke test: an automated regression test for
+  the escalation lifecycle itself, not just the happy path. See below.
+
+**Checked `replay.py`'s existing output/exit-code behavior before
+touching it, per the brief for this work.** The single-run CLI path
+already prints one clean JSON blob to stdout and returns exit code `1`
+on `hard_failure`, `0` on `success`/`business_outcome`
+(`agent/replay.py::main`) — sufficient for a workflow step to assert on
+structurally. No change was made to `replay.py`; the ask was to avoid
+screen-scraping, not to add flags preemptively where the existing
+contract already suffices.
+
+**The `10004` escalation check is real automation of the human
+handoff, not a mocked one.** `.github/scripts/check_escalation_lifecycle.py`
+starts `agent.replay --headless` against `10004` with `AGENT_CDP_PORT`
+set (the same CDP-attach mechanism validated during cross-tenant
+escalation testing — see "Discovery agent" era entries in BUILD_LOG.md
+— now driven by CI instead of by hand), polls the shared
+`sessions.db` until the run reaches `status: "paused"`, `pause_reason:
+"on_unrecognized_dialog"`, attaches a second Playwright process to the
+SAME live browser to click the modal's "Continue" button — standing in
+for the human who'd otherwise do this — then `POST`s the real
+`agent.operator_console` `/resume/<run_id>` endpoint and asserts the
+paused run completes with `status: "success"`. Dismissing the dialog
+before resuming is not optional: `/resume` only flips `owner` back to
+`automation` (`agent/operator_console.py`), so resuming without first
+clearing the dialog would just re-detect it on the next CHECK-phase
+pass and re-escalate — this script exercises the handoff contract for
+real, not a stand-in that skips the part that makes it a handoff.
+
+The lookup for "the run that just paused" is scoped to `sessions.db`
+rows updated at-or-after the script's own start time, not just "the
+most recent paused row" — a fresh CI checkout never has this problem
+(`evidence/sessions/` is gitignored), but local reruns against a
+long-lived `sessions.db` can carry stale paused rows from earlier,
+unrelated manual escalation tests, and an unscoped query picked one up
+during local verification of this script. Fixed before this ever ran
+in CI. See BUILD_LOG.md 2026-08-26 ("CI: replay smoke test") for the
+full verification transcript.
+
+README.md's status badge at the top points at this workflow.
+
 ## Open / not yet decided
 
 - Compiler phase: the compiled artifact's `guardrails.allowlist_routes`

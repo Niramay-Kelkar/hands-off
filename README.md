@@ -1,5 +1,7 @@
 # hands-off
 
+[![Replay smoke test](https://github.com/Niramay-Kelkar/hands-off/actions/workflows/replay-smoke-test.yml/badge.svg)](https://github.com/Niramay-Kelkar/hands-off/actions/workflows/replay-smoke-test.yml)
+
 A computer-use automation system that gives AI agents hands inside legacy
 back-office software that has no API. An LLM discovers how to complete a
 task once by driving a real UI, that discovery is compiled into a typed,

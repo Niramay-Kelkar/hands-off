@@ -959,3 +959,79 @@ feature actually is relative to the other three safety mechanisms
 already documented there.
 
 **Committed:** pending.
+
+---
+
+## 2026-08-26 — CI: replay smoke test
+
+**Built:** `.github/workflows/replay-smoke-test.yml`, triggered on both
+`push` to `main` and `pull_request` (so branch protection can gate
+merges on it, not just report status afterward). Scoped to exactly the
+deterministic half of the system — `agent.replay` against the
+already-compiled `member_balance_lookup` artifact. No discovery, no
+compilation, nothing requiring `ANTHROPIC_API_KEY`, no Python version
+matrix, no parallel job splitting — deliberate, see CLAUDE.md.
+
+Steps: checkout, Python 3.11, `pip install -r requirements.txt`,
+`playwright install --with-deps chromium`, seed `target_app`'s DB,
+`docker compose up -d --build target_app operator_console` (reused
+as-is, no new compose service), then four replay checks:
+
+- `10001` → asserts `status: "success"`, correct outputs.
+- `10002` → asserts `status: "business_outcome"`, `outcome_code:
+  "ACCESS_DENIED"`.
+- `99999` → asserts `status: "business_outcome"`, `outcome_code:
+  "MEMBER_NOT_FOUND"`.
+- `10004` — the standout check: an automated regression test for the
+  escalation lifecycle itself, not just the happy path. A new script,
+  `.github/scripts/check_escalation_lifecycle.py`, launches
+  `agent.replay --headless` against `10004` with `AGENT_CDP_PORT` set
+  (the same CDP-attach mechanism validated during the cross-tenant
+  escalation testing, now driven by CI instead of by hand), polls
+  `sessions.db` until the run reaches `status: "paused"`,
+  `pause_reason: "on_unrecognized_dialog"`, attaches a second Playwright
+  process to the SAME live browser to click the modal's "Continue"
+  button (standing in for a human fixing the page in place — resuming
+  without this would just re-detect the still-open dialog and
+  re-escalate, since `/resume` only flips `owner`, per
+  `agent/operator_console.py`), `POST`s the real
+  `/resume/<run_id>` endpoint, then asserts the paused run completes
+  with `status: "success"`.
+
+**Checked replay.py's output/exit-code behavior first, per the ask,
+before adding anything to it.** The single-run CLI path already prints
+one clean JSON blob to stdout and returns exit code `1` on
+`hard_failure`, `0` on `success`/`business_outcome` (`agent/replay.py`,
+`main()`). That's sufficient for a shell step to assert on structurally
+(`json.load` + field checks) — no CLI change was needed, and none was
+made; the ask was explicit about avoiding screen-scraping, not about
+adding flags preemptively.
+
+**Bug found and fixed while validating the escalation script locally,
+before it ever ran in CI:** the first version of
+`check_escalation_lifecycle.py` picked "the most recently paused row"
+in `sessions.db` with no time bound. Locally, `sessions.db` had several
+stale `status: "paused"` rows left behind by earlier, unrelated manual
+escalation tests from prior sessions — the script picked one of those
+up instead of the run it had just launched, then correctly failed with
+"replay did not complete after resume" (it was resuming a process that
+no longer existed). Fixed by scoping the lookup to rows with
+`updated_at` at-or-after the script's own start time (with a few
+seconds of slack for clock skew). This wouldn't have surfaced in a
+genuinely fresh CI checkout (`evidence/sessions/` is gitignored), but
+it's a correctness gap regardless of what triggered it, so it's fixed
+rather than left as a "works in CI, not reliably re-runnable locally"
+footgun.
+
+**Verified end to end on this machine**, running the exact commands the
+workflow runs (`docker compose up -d --build target_app
+operator_console`, then all four replay checks in sequence, including
+the escalation script after clearing the stale rows described above):
+all four passed. `docker compose down` afterward; no stray containers,
+temp files, or uncommitted state left behind (`git status` clean aside
+from the new `.github/` files).
+
+**Documentation:** CLAUDE.md gained a "CI: replay smoke test" section.
+README.md gained a status badge at the top, pointed at this workflow.
+
+**Committed:** pending.

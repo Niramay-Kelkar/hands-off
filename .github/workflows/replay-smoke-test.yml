@@ -1,0 +1,104 @@
+name: Replay smoke test
+
+# Deliberately scoped to the deterministic half of the system only:
+# agent.replay against an already-compiled artifact. No discovery, no
+# compilation, nothing requiring ANTHROPIC_API_KEY, no Python version
+# matrix, no parallel job splitting — that boundary is intentional, not
+# a gap (see CLAUDE.md).
+#
+# Runs on both push to main and pull_request so branch protection can
+# actually gate merges on this, not just report status after the fact.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  replay-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Seed target_app database
+        run: python -m target_app.seed
+
+      - name: Start target_app + operator_console
+        run: docker compose up -d --build target_app operator_console
+
+      - name: Wait for services to come up
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/members >/dev/null && curl -sf http://localhost:8100/ >/dev/null; then
+              echo "services up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "services did not become ready in time" >&2
+          docker compose logs
+          exit 1
+
+      - name: Replay 10001 (success)
+        run: |
+          set -euo pipefail
+          python -m agent.replay --capability schema/capabilities/member_balance_lookup.compiled.json \
+            --input member_id=10001 --headless | tee /tmp/result_10001.json
+          python - <<'PY'
+          import json
+          r = json.load(open("/tmp/result_10001.json"))
+          assert r["status"] == "success", r
+          assert r["outputs"]["member_name"] == "Jane Doe", r
+          assert r["outputs"]["savings_balance"] == 4521.10, r
+          print("PASS: 10001 -> success")
+          PY
+
+      - name: "Replay 10002 (business outcome: access denied)"
+        run: |
+          set -euo pipefail
+          python -m agent.replay --capability schema/capabilities/member_balance_lookup.compiled.json \
+            --input member_id=10002 --headless | tee /tmp/result_10002.json
+          python - <<'PY'
+          import json
+          r = json.load(open("/tmp/result_10002.json"))
+          assert r["status"] == "business_outcome", r
+          assert r["outcome_code"] == "ACCESS_DENIED", r
+          print("PASS: 10002 -> business_outcome/ACCESS_DENIED")
+          PY
+
+      - name: "Replay 99999 (business outcome: not found)"
+        run: |
+          set -euo pipefail
+          python -m agent.replay --capability schema/capabilities/member_balance_lookup.compiled.json \
+            --input member_id=99999 --headless | tee /tmp/result_99999.json
+          python - <<'PY'
+          import json
+          r = json.load(open("/tmp/result_99999.json"))
+          assert r["status"] == "business_outcome", r
+          assert r["outcome_code"] == "MEMBER_NOT_FOUND", r
+          print("PASS: 99999 -> business_outcome/MEMBER_NOT_FOUND")
+          PY
+
+      # The standout check: an automated regression test for the
+      # escalation lifecycle itself (pause -> operator resume ->
+      # completes), not just the happy path. See the script for the
+      # full mechanism.
+      - name: "Replay 10004 (escalation lifecycle: pause -> operator resume -> success)"
+        run: python .github/scripts/check_escalation_lifecycle.py
+
+      - name: Stop services
+        if: always()
+        run: docker compose down
