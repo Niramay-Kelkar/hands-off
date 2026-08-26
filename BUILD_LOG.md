@@ -714,3 +714,112 @@ this change also happens to fix. Verified: `/?run_id=<unknown>` correctly
 renders "no run" rather than falling back to an unrelated paused run.
 
 **Committed:** pending.
+
+## 2026-08-25 — Cross-tenant reuse: converted the "untested bet" into a tested result
+
+REPORT.md's Heterogeneity section previously stated the multi-tenant
+locator-resilience claim was "a bet, not a proof — it was not tested
+against a second, differently-configured instance of the same
+application." Built `target_app_tenant_b/` to close that gap on a
+single-session time budget.
+
+**What was built**: a second Flask app (`target_app_tenant_b/`), same
+search → results → detail flow as `target_app`, genuinely different
+branding/markup/CSS ("Northbrook Community Credit Union", flexbox/card
+layout, green palette, `<ul>` results instead of a `<table>`, `cu-*`
+class names with zero overlap with tenant A's `frmOuter`/`dtlCell`/`c1`/
+`c2`) but the exact same accessible role + name on every interactive
+element the compiled artifact locates: `<label>Member ID</label>`,
+`Search` button, results link named for the bare member ID, detail-page
+cells `Name:` / `Savings Balance:`. Separate `members_b.db`, one
+happy-path member (`20001`, Alice Nguyen) and reliance on a genuine
+zero-row SELECT for the not-found case (`29999`) — deliberately not the
+full five-outcome matrix tenant A has (no slow-load/interstitial
+re-seeded on tenant B), per the scoped instructions for this pass.
+
+**Constraint discovered while wiring up the test**: `agent/engine.py`
+derives `allowed_origin` from the artifact's own `target.entry_point`,
+not from wherever the browser actually navigates — so replaying the
+artifact *unmodified* requires it to be reachable at that same origin.
+Originally worked around by running tenant B on port 8000, in place of
+`target_app`, one at a time. Revised on request: `target_app_tenant_b`
+now takes its own port via `TENANT_B_PORT` (default 8001, read in
+`target_app_tenant_b/server.py`), and `docker-compose.yml` gained a
+`target_app_tenant_b` service (published `8001:8001`) alongside
+`target_app` (`8000:8000`) so both run concurrently — same
+bind-mount-the-repo-root pattern as the existing services. To still
+replay the tenant-A-recorded artifact unmodified against tenant B now
+that they're on different origins, the test loads
+`member_balance_lookup.compiled.json`, writes an in-memory copy with
+only `target.app`/`target.entry_point` repointed at `localhost:8001`,
+and replays that copy — every step/locator/checkpoint byte-identical to
+the shipped artifact; `schema/capabilities/member_balance_lookup.compiled.json`
+itself stays untouched, still pointed at tenant A.
+
+**Test**, both apps up simultaneously: `python -m target_app.server`
+(8000) and `python -m target_app_tenant_b.server` (8001, after
+`python -m target_app_tenant_b.seed`), then replayed the port-8001
+artifact copy:
+
+```
+python -m agent.replay --capability <tenant-b-port-copy> --input member_id=20001 --headless
+{"status": "success", "outputs": {"member_name": "Alice Nguyen", "savings_balance": 8390.55}}
+
+python -m agent.replay --capability <tenant-b-port-copy> --input member_id=29999 --headless
+{"status": "business_outcome", "outcome_code": "MEMBER_NOT_FOUND", "step_id": 2}
+```
+
+**Result: identical to the original (port-8000-shared) test.** Same two
+outcomes, same values. `log.jsonl` for both runs shows every locator
+resolution — 5 on the `20001` run, 2 on the `29999` run — hitting the
+primary `accessibility` strategy; zero fallback to `text_label`, exactly
+as before. Concurrent operation changed nothing about the result, as
+expected — it only removed the "run one or the other" constraint.
+
+**Evidence requirement, explicit this time — did the screenshot pipeline
+actually save screenshots?** Checked directly rather than assumed: both
+raw run directories' `screenshots/` came back empty. This is correct
+behavior, not a gap — `evidence_policy.screenshot_on` is
+`[checkpoint_failure, hard_failure]` only, and neither run hit either
+condition. Confirmed this is the existing, intentional pattern, not
+something specific to tenant B: `evidence/replays/success_10001/` and
+`evidence/replays/business_outcome_not_found_99999/` (both tenant A,
+saved back on 2026-08-16) also have no `screenshots/` contents, for the
+identical reason. Nothing to backfill in the automatic pipeline's own
+output — re-saved `evidence/replays/cross_tenant_b_success_20001/` and
+`evidence/replays/cross_tenant_b_not_found_29999/` from the new
+port-8001 runs regardless, so the evidence reflects the final concurrent
+setup rather than the superseded shared-port one.
+
+**What the automatic pipeline can't produce on its own — a clean success
+screenshot — was captured explicitly**, since screenshot-on-failure-only
+means no run in this whole evidence set has ever shown what a *working*
+page looks like. A short standalone Playwright script (not part of
+`agent/`, run directly against both live apps) navigated to tenant A's
+`/members/10001` and tenant B's `/members/20001` and took a full-page
+screenshot of each, masking the account-number cell the same way
+`agent/evidence.py`'s `save_screenshot` does (Playwright's native
+`mask=`), consistent with the rest of the repo's redaction discipline
+even though this script runs outside the replay engine. One bug on the
+way: the first attempt located the mask target via
+`page.locator("tr", has_text="Account Number:")`, which on tenant A's
+genuinely nested `<table>` markup matches every ancestor `<tr>` that
+contains that text too (the outer content-cell row, not just the
+specific label/value row) — chaining `.locator("td").nth(1)` off that
+multi-element match grabbed the wrong `<td>` and blacked out most of the
+page. Fixed by locating the label cell itself via
+`get_by_role("cell", name="Account Number:", exact=True)` and taking its
+`xpath=following-sibling::td[1]` — unambiguous regardless of nesting.
+Saved as `evidence/replays/cross_tenant_b_20001/tenant_a_detail_10001.png`
+and `.../tenant_b_detail_20001.png` — same artifact, two visually
+distinct tenants, side by side.
+
+`evidence/README.md` updated to document all three `cross_tenant_b_*`
+evidence directories (previously only referenced in REPORT.md/this log,
+not indexed there) and to frame the paired screenshots explicitly as the
+visual proof of the claim, with the log-based fallback data as the
+mechanism proof underneath it. `target_app_tenant_b/README.md` updated
+for the new port and the artifact-copy mechanism.
+
+**Committed:** pending.
+

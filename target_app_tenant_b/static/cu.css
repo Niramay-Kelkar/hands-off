@@ -1,0 +1,178 @@
+body {
+  font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  color: #1c2b1f;
+  background: #f4f7f4;
+  margin: 0;
+}
+
+.cu-topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  background: #1f5c3e;
+  color: #fff;
+  padding: 14px 24px;
+}
+
+.cu-brand {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+.cu-tagline {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.cu-shell {
+  display: flex;
+  min-height: calc(100vh - 52px);
+}
+
+.cu-sidebar {
+  width: 220px;
+  background: #e6ede7;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.cu-navHead {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #4c6b55;
+  margin-bottom: 8px;
+}
+
+.cu-noticeFrame {
+  width: 100%;
+  height: 140px;
+  border: none;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.cu-main {
+  flex: 1;
+  padding: 24px;
+}
+
+.cu-panel {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.cu-panelTitle {
+  margin: 0 0 14px 0;
+  font-size: 17px;
+  color: #1f5c3e;
+}
+
+.cu-formRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cu-formLabel {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.cu-formInput {
+  padding: 7px 10px;
+  border: 1px solid #b7c9bb;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.cu-primaryBtn {
+  background: #1f5c3e;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 18px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cu-primaryBtn:hover {
+  background: #17462f;
+}
+
+.cu-alertBanner {
+  background: #8a1f2b;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 5px;
+}
+
+.cu-emptyState {
+  color: #6b7d6f;
+  font-style: italic;
+}
+
+.cu-resultList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cu-resultRow {
+  display: flex;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #dde6de;
+  border-radius: 5px;
+}
+
+.cu-resultLink {
+  font-weight: 700;
+  color: #1f5c3e;
+  text-decoration: none;
+}
+
+.cu-resultLink:hover {
+  text-decoration: underline;
+}
+
+.cu-detailTable {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.cu-detailTable td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e9e3;
+}
+
+.cu-fieldLabel {
+  font-weight: 600;
+  color: #4c6b55;
+  width: 180px;
+}
+
+.cu-noticeCard {
+  font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cu-noticeHead {
+  background: #1f5c3e;
+  color: #fff;
+  font-weight: 600;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.cu-noticeBody {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #33463a;
+}

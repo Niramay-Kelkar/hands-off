@@ -58,9 +58,9 @@ python -m target_app.server
 
 ### Quick start via Docker
 
-`target_app` and `operator_console` are plain Flask processes with no
-browser dependency, so they're the two pieces that make sense to
-containerize. `agent.discover`, `agent.replay`, and
+`target_app`, `target_app_tenant_b`, and `operator_console` are plain
+Flask processes with no browser dependency, so they're the pieces that
+make sense to containerize. `agent.discover`, `agent.replay`, and
 `agent.capability_api` all drive a real, visible Playwright browser via
 `agent.engine.run_capability()` — that needs X11/VNC forwarding to run
 in a container, which isn't worth the complexity here, so those three
@@ -69,22 +69,51 @@ services over `localhost`.
 
 ```bash
 docker compose up -d --build
-# target_app:        http://localhost:8000
-# operator_console:   http://localhost:8100
+# target_app:          http://localhost:8000
+# target_app_tenant_b: http://localhost:8001
+# operator_console:    http://localhost:8100
 ```
 
-Both containers bind-mount the repo root, so they share
-`target_app/members.db` and `evidence/sessions/sessions.db` with
-whatever you run on the host — no separate seeding or config needed. If
-`target_app/members.db` doesn't exist yet (it's gitignored, generated
-data), seed it once via either environment:
+`target_app_tenant_b` is a second, differently-branded app (same
+search -> results -> detail flow, different company/CSS/markup) used to
+test cross-tenant reuse — see `target_app_tenant_b/README.md` and
+REPORT.md Section 4. It runs on its own port, concurrently with
+`target_app`, not in place of it.
+
+All three containers bind-mount the repo root, so they share
+`target_app/members.db`, `target_app_tenant_b/members_b.db`, and
+`evidence/sessions/sessions.db` with whatever you run on the host — no
+separate seeding or config needed. If a `members.db` doesn't exist yet
+(gitignored, generated data), seed it once via either environment:
 
 ```bash
 docker compose run --rm target_app python -m target_app.seed
-# or, with the host venv active: python -m target_app.seed
+docker compose run --rm target_app_tenant_b python -m target_app_tenant_b.seed
+# or, with the host venv active: python -m target_app.seed / python -m target_app_tenant_b.seed
 ```
 
 Bring the containers down with `docker compose down`.
+
+**Pointing a replay at either tenant:** `agent.replay --capability` reads
+the target from the artifact file itself (`target.entry_point`), not
+from a flag — the guardrail's allowed origin is derived from that same
+field, so it can't be overridden on the command line. Replaying against
+`target_app` (8000) needs no change:
+
+```bash
+python -m agent.replay --capability schema/capabilities/member_balance_lookup.compiled.json --input member_id=10001
+```
+
+Replaying the *same, unmodified* artifact against `target_app_tenant_b`
+(8001) means pointing at a copy with only `target.entry_point`/
+`target.app` repointed at `localhost:8001` (the mechanical
+steps/locators/checkpoints are otherwise byte-identical); see
+`BUILD_LOG.md`'s cross-tenant entries for exactly how that copy is made.
+That replay — the same compiled `member_balance_lookup` artifact,
+recorded once against tenant A, replayed unmodified against a
+differently-branded tenant B with zero code or artifact changes and
+identical locator/checkpoint/escalation behavior — is the cross-tenant
+demo; see REPORT.md Section 4 for the full result.
 
 ## Demo path
 
@@ -172,6 +201,10 @@ hands-off/
   agent/                   discovery loop, replay engine, compiler, artifact
                             schema/models, operator console, capability API
   target_app/               the local demo bank application being automated
+  target_app_tenant_b/      second, differently-branded app used for the
+                            cross-tenant replay test (see its README.md and
+                            REPORT.md Section 4); binds the same port as
+                            target_app, run one or the other, not both
   schema/
     example_artifact.json   hand-authored reference artifact (schema docs)
     capabilities/            compiled artifacts served by agent.capability_api

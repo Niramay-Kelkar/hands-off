@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="cu-panel cu-detailPanel">
+  <h2 class="cu-panelTitle">Account Summary</h2>
+  <table class="cu-detailTable">
+    <tbody>
+      <tr><td class="cu-fieldLabel">Name:</td><td class="cu-fieldValue">{{ member.name }}</td></tr>
+      <tr><td class="cu-fieldLabel">Savings Balance:</td><td class="cu-fieldValue">${{ '%.2f'|format(member.savings_balance) }}</td></tr>
+      <tr><td class="cu-fieldLabel">Account Number:</td><td class="cu-fieldValue">{{ member.account_number }}</td></tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

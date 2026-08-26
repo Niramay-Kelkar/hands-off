@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="cu-panel cu-searchPanel">
+  <h1 class="cu-panelTitle">Find a Member</h1>
+  <form action="{{ url_for('members_search') }}" method="get" class="cu-searchForm">
+    <div class="cu-formRow">
+      <label for="memberIdBox" class="cu-formLabel">Member ID</label>
+      <input id="memberIdBox" name="member_id" type="text" class="cu-formInput" value="{{ member_id }}">
+      <button type="submit" class="cu-primaryBtn">Search</button>
+    </div>
+  </form>
+</section>
+
+{% if searched %}
+<section class="cu-panel cu-resultsPanel">
+  {% if outcome == 'access_denied' %}
+    <div class="cu-alertBanner" role="alert">You do not have permission to view this member.</div>
+  {% elif outcome == 'not_found' %}
+    <div class="cu-results" role="region" aria-label="results_region">
+      <p class="cu-emptyState">No records found</p>
+    </div>
+  {% elif result %}
+    <div class="cu-results" role="region" aria-label="results_region">
+      <ul class="cu-resultList" aria-label="Search results">
+        <li class="cu-resultRow">
+          <a class="cu-resultLink" href="{{ url_for('member_detail', member_id=result.id) }}">{{ result.id }}</a>
+          <span class="cu-resultName">{{ result.name }}</span>
+        </li>
+      </ul>
+    </div>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

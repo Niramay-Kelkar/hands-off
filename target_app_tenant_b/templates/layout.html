@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Northbrook Community Credit Union{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='cu.css') }}">
+</head>
+<body>
+  <header class="cu-topbar">
+    <div class="cu-brand">Northbrook Community Credit Union</div>
+    <div class="cu-tagline">Member Self-Service Center</div>
+  </header>
+  <div class="cu-shell">
+    <aside class="cu-sidebar">
+      <nav class="cu-nav">
+        <div class="cu-navHead">Quick Links</div>
+        <iframe class="cu-noticeFrame" src="{{ url_for('branch_notice') }}" title="Branch Notices"></iframe>
+      </nav>
+    </aside>
+    <main class="cu-main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

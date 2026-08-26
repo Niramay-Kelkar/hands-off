@@ -8,6 +8,7 @@ __pycache__/
 
 # Generated target_app data (recreate with `python -m target_app.seed`)
 target_app/members.db
+target_app_tenant_b/members_b.db
 
 # Environment / secrets
 .env

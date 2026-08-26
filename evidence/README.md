@@ -62,7 +62,31 @@ wrong.
   `member_name: "Pat Whitfield"`. This is the human-in-the-loop
   escalation requirement — control transfers over the same live session,
   not a TODO.
-
+- **`cross_tenant_b_success_20001/`** and **`cross_tenant_b_not_found_29999/`**
+  — the cross-tenant reuse test from REPORT.md Section 4:
+  `member_balance_lookup.compiled.json`, recorded once against tenant A
+  and never touched since, replayed against `target_app_tenant_b` (a
+  second, differently-branded app — different CSS, layout, and DOM
+  shape, same accessible roles/names) on its own port. `log.jsonl` in
+  both shows every locator resolution across both steps hitting the
+  primary `accessibility` strategy — zero fallback to `text_label`.
+  `screenshots/` is empty in both, correctly: `evidence_policy` only
+  captures a screenshot on `checkpoint_failure`/`hard_failure`, and
+  neither run hit either (same as `success_10001/` and
+  `business_outcome_not_found_99999/` above, which have no screenshots
+  either, for the same reason) — confirmed, not assumed, by checking the
+  raw run directories before curating these.
+- **`cross_tenant_b_20001/`** — since the automatic pipeline only
+  screenshots on failure, this is a deliberate, explicit capture of both
+  tenants' *working* detail pages for the same underlying capability:
+  `tenant_a_detail_10001.png` (First Meridian Trust & Savings, beige
+  nested-table layout) and `tenant_b_detail_20001.png` (Northbrook
+  Community Credit Union, green flexbox/card layout) — same artifact,
+  two visually distinct tenants. This pair is the actual visual proof of
+  the cross-tenant claim; the log data above proves the mechanism, this
+  proves the outcome. Account number is masked in both, consistent with
+  `redaction/` below, even though these were captured outside the replay
+  engine.
 ## `redaction/`
 
 Proof that `evidence_policy.redact_fields` is enforced against a real
