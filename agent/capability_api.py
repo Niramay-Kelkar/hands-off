@@ -37,10 +37,13 @@ def _headed_default() -> bool:
 
 
 def _scan_capabilities() -> dict[str, Capability]:
-    """schema/capabilities/ only — schema/example_artifact.json stays
-    schema documentation, excluded by directory boundary, not inferred."""
+    """schema/capabilities/ and its immediate subdirectories (e.g.
+    schema/capabilities/meridian/) — schema/example_artifact.json stays
+    schema documentation, excluded by directory boundary, not inferred.
+    Non-capability sibling files (*.approval.json, *.confidence.json,
+    *.policy.json) are attempted and skipped on validation failure."""
     catalog: dict[str, Capability] = {}
-    for path in sorted(CAPABILITIES_DIR.glob("*.json")):
+    for path in sorted(CAPABILITIES_DIR.glob("*.json")) + sorted(CAPABILITIES_DIR.glob("*/*.json")):
         try:
             cap = Capability.load(path)
         except Exception as exc:
