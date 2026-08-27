@@ -72,6 +72,13 @@ def _css(scope: Page, strategy: LocatorStrategyModel, params: dict[str, str]) ->
     return scope.locator(selector)
 
 
+@LOCATOR_REGISTRY.register("label_proximity")
+def _label_proximity(scope: Page, strategy: LocatorStrategyModel, params: dict[str, str]) -> Locator:
+    label = substitute(get_field(strategy, "label"), params)
+    row = scope.locator(f"tr:has-text({label!r})").first
+    return row.locator("input, select, textarea").first
+
+
 def resolve_locator(
     strategies: list[LocatorStrategyModel], ctx: "RunContext", *, timeout_ms: int = 3000
 ) -> ResolvedLocator:
