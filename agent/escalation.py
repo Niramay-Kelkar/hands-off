@@ -114,6 +114,23 @@ def latest_paused_run() -> sqlite3.Row | None:
         conn.close()
 
 
+def latest_run_since(capability_id: str, since_iso: str) -> sqlite3.Row | None:
+    """Most recently-updated run for a capability at or after a timestamp.
+    Used by the chat driver to correlate the run it just kicked off through
+    the invoke API (which doesn't hand back a run_id) with its sessions.db
+    row, so it can watch that row for a pause."""
+    conn = _connect()
+    conn.row_factory = sqlite3.Row
+    try:
+        return conn.execute(
+            "SELECT * FROM runs WHERE capability_id=? AND updated_at>=? "
+            "ORDER BY updated_at DESC LIMIT 1",
+            (capability_id, since_iso),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
 def get_run(run_id: str) -> sqlite3.Row | None:
     """Scoped lookup for a specific run, as opposed to latest_paused_run()'s
     system-wide "whatever's most recently paused" — used by the operator
