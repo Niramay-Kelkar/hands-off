@@ -1,0 +1,17 @@
+{"ts": "2026-08-27T06:36:55.937295+00:00", "kind": "run_start", "capability_id": "meridian_sign_on", "version": 1, "params": {"operator_id": "teller1", "password": "[REDACTED]", "branch": "MAIN-001 - Main Office"}}
+{"ts": "2026-08-27T06:36:58.113183+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:36:58.190377+00:00", "kind": "action", "type": "select", "value": "MAIN-001 - Main Office"}
+{"ts": "2026-08-27T06:36:59.245881+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T06:36:59.295978+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:36:59.376176+00:00", "kind": "action", "type": "type", "value": "teller1"}
+{"ts": "2026-08-27T06:37:00.448996+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T06:37:00.500783+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:37:00.649345+00:00", "kind": "action", "type": "type", "value": "password"}
+{"ts": "2026-08-27T06:37:01.713538+00:00", "kind": "checkpoint", "step_id": 3, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T06:37:01.764286+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:37:01.967797+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T06:37:03.051337+00:00", "kind": "checkpoint", "step_id": 4, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T06:37:03.112739+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:37:03.195210+00:00", "kind": "action", "type": "extract", "output": "menu_heading", "strategy_kind": "accessibility"}
+{"ts": "2026-08-27T06:37:04.261699+00:00", "kind": "checkpoint", "step_id": 5, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T06:37:04.364047+00:00", "kind": "run_end", "status": "success"}

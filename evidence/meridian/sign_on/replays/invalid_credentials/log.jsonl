@@ -1,0 +1,14 @@
+{"ts": "2026-08-27T06:43:38.854089+00:00", "kind": "run_start", "capability_id": "meridian_sign_on", "version": 1, "params": {"operator_id": "teller1", "password": "[REDACTED]", "branch": "MAIN-001 - Main Office"}}
+{"ts": "2026-08-27T06:43:40.883614+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:43:40.949060+00:00", "kind": "action", "type": "select", "value": "MAIN-001 - Main Office"}
+{"ts": "2026-08-27T06:43:42.563983+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T06:43:43.029442+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:43:43.326751+00:00", "kind": "action", "type": "type", "value": "teller1"}
+{"ts": "2026-08-27T06:43:44.407306+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T06:43:44.471609+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:43:44.624151+00:00", "kind": "action", "type": "type", "value": "WRONGPASSWORD"}
+{"ts": "2026-08-27T06:43:45.677135+00:00", "kind": "checkpoint", "step_id": 3, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T06:43:45.718977+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T06:43:45.974229+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T06:43:49.036219+00:00", "kind": "checkpoint", "step_id": 4, "matched": true, "outcome_code": "INVALID_CREDENTIALS", "detail": null}
+{"ts": "2026-08-27T06:43:49.089901+00:00", "kind": "run_end", "status": "business_outcome"}
