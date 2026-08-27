@@ -25,14 +25,33 @@ class SensitiveField:
     locator: Locator
 
 
+def normalize_label(text: str) -> str:
+    """Lowercase and collapse runs of whitespace AND underscores to a
+    single space, so a redact_fields entry can be declared either as
+    natural on-page label text ("New Share ID") or pre-joined
+    (DEFAULT_REDACT_FIELDS's own "account_number" style) and still match
+    a label the other way. Caller strips any trailing ':' first.
+
+    Found live: with the old space-vs-underscore-only handling, a
+    multi-word natural-text entry like "New Share ID" could never match
+    here, because `wanted` kept it space-form while the label side was
+    joined with underscores -- silently un-redactable regardless of what
+    was declared, only unnoticed until Open New Share's confirmation
+    page ("New Share ID:") was the first multi-word ROW label (as
+    opposed to a column header or select-detection label, which already
+    matched on space-preserved text) ever exercised against this path.
+    """
+    return re.sub(r"[\s_]+", " ", text.strip().lower())
+
+
 def find_sensitive_fields(page: Page, redact_fields: list[str]) -> list[SensitiveField]:
     """Scans the current page for label cells whose normalized text
-    matches a redact_fields entry (e.g. "Account Number:" -> "account_number"),
+    matches a redact_fields entry (e.g. "Account Number:" -> "account number"),
     returning the real value and a Locator on it for each match found."""
     if not redact_fields:
         return []
 
-    wanted = {f.strip().lower() for f in redact_fields}
+    wanted = {normalize_label(f) for f in redact_fields}
     found: list[SensitiveField] = []
 
     cells = page.get_by_role("cell")
@@ -41,7 +60,7 @@ def find_sensitive_fields(page: Page, redact_fields: list[str]) -> list[Sensitiv
         text = cell.inner_text().strip()
         if not text.endswith(":"):
             continue
-        normalized = re.sub(r"\s+", "_", text[:-1].strip().lower())
+        normalized = normalize_label(text[:-1])
         if normalized not in wanted:
             continue
 
@@ -50,7 +69,8 @@ def find_sensitive_fields(page: Page, redact_fields: list[str]) -> list[Sensitiv
             continue
         value = sibling.inner_text().strip()
         if value:
-            found.append(SensitiveField(field_name=normalized, value=value, locator=sibling))
+            field_name = re.sub(r"\s+", "_", normalized)
+            found.append(SensitiveField(field_name=field_name, value=value, locator=sibling))
 
     found.extend(_find_column_fields(page, wanted))
     found.extend(_find_select_option_fields(page, wanted))
@@ -63,12 +83,10 @@ def _find_column_fields(page: Page, wanted: set[str]) -> list[SensitiveField]:
     (e.g. "Share ID") naming an entire column, whose sensitive values are
     one per data row rather than living next to a single label cell.
 
-    Unlike the row path's normalization (spaces -> underscore, matching
-    config entries already given in that form, e.g. "account_number"),
-    this path's config entries come as their natural on-page header text
-    (e.g. "Share ID") -- so matching only lowercases/strips, no underscore
-    join. Both conventions read from the same `wanted` set; which one
-    applies depends on how the caller's redact_fields entry is spelled.
+    Uses the same `normalize_label` matching as the row path above, so a
+    `redact_fields` entry can be declared either as natural header text
+    (e.g. "Share ID") or pre-joined (e.g. "account_number") and match
+    either way.
 
     Uses xpath child-axis locators (./tr, ./td|./th), not the descendant
     locators used elsewhere in this module, because a plain CSS/role
@@ -104,9 +122,9 @@ def _find_column_fields(page: Page, wanted: set[str]) -> list[SensitiveField]:
             continue
         for col in range(header_cells.count()):
             header_text = header_cells.nth(col).inner_text().strip()
-            normalized = header_text.lower()
-            if normalized.endswith(":"):
-                normalized = normalized[:-1].strip()
+            if header_text.endswith(":"):
+                header_text = header_text[:-1].strip()
+            normalized = normalize_label(header_text)
             if normalized not in wanted:
                 continue
 
@@ -156,10 +174,10 @@ def _find_select_option_fields(page: Page, wanted: set[str]) -> list[SensitiveFi
         label_cell = row.locator("xpath=./td[1] | ./th[1]")
         if label_cell.count() == 0:
             continue
-        label_text = label_cell.first.inner_text().strip().lower()
+        label_text = label_cell.first.inner_text().strip()
         if label_text.endswith(":"):
             label_text = label_text[:-1].strip()
-        normalized_label = re.sub(r"\s+", " ", label_text)
+        normalized_label = normalize_label(label_text)
         if normalized_label not in wanted:
             continue
 

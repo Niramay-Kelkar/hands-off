@@ -1,0 +1,40 @@
+Findings for the task's specific question: does Share Type selection
+hit a redaction/discovery conflict similar to Funds Transfer's Share ID
+one?
+
+Checked, not assumed: the Open New Share form's "* Share Type" <select>
+enumerates exactly 4 generic type codes --
+
+  S0001 - Regular Shares
+  S0070 - Share Draft (Checking)
+  MMKT  - Money Market
+  CERT  - Certificate
+
+-- not per-member Share IDs. These are share TYPE codes shared across
+every member (the same 4 options appear for any member), not account
+identifiers, so "Share ID" (already a redact_fields entry, meant for
+actual per-member account numbers like "100234-MMKT-3") was correctly
+NOT declared against this select, and the discovery run above ran with
+the full baseline redact_fields (password, E-mail, Phone, Address,
+Share ID, New Share ID) with no need to omit anything -- unlike Funds
+Transfer/Place Account Hold, where the model had to read real,
+per-member Share IDs to pick a specific share and Share ID had to be
+temporarily excluded from --redact-fields for that reason. No such
+exclusion was needed or used here.
+
+A real, separate redaction gap WAS found and fixed during this task,
+independent of Share Type: the post-submit confirmation page's
+"New Share ID:" label is a different label from "Share ID" and was not
+being caught by the existing row-based label:value detection path,
+even when explicitly declared -- a pre-existing bug in
+agent/redaction.py's normalization (multi-word natural-text
+redact_fields entries could never match there; only single-word entries
+like "E-mail"/"Phone"/"Address" had ever exercised that path before).
+Fixed at the source (agent/redaction.py) rather than worked around, and
+"New Share ID" added as its own redact_fields entry here -- a deviation
+from the task's literal 5-field list (password, E-mail, Phone, Address,
+Share ID), made because leaving it off would leave a genuine per-member
+account identifier unredacted on this capability's own confirmation
+screen. See the real, verified example in this directory's
+screenshots/step_16_step.png and trajectory.json (0 raw share IDs, the
+new share id masked).

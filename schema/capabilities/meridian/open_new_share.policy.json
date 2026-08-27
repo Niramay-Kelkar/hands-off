@@ -1,0 +1,78 @@
+{
+  "capability_id": "meridian_open_new_share",
+  "description": "Sign on to MERIDIAN CORE, open a new share for a member with a chosen share type and initial deposit, and post it for real.",
+  "version": 1,
+  "risk_class": "mutating",
+  "expected_outcomes": [
+    {
+      "code": "INVALID_CREDENTIALS",
+      "description": "The operator ID/password/branch combination was rejected by the sign-on form",
+      "detection": {
+        "type": "text_present",
+        "value": "Invalid operator ID or password.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "MINIMUM_DEPOSIT_NOT_MET",
+      "description": "The requested initial deposit is below the minimum required for the chosen share type -- real text captured from a live $1.00 deposit on a Regular Shares share ('A minimum opening deposit of $5.00 is required.') and a $50.00 deposit on a Certificate share ('Certificates require a minimum opening deposit of $500.00.'); both share the substring matched here, since per-share-type minimums are not enumerated as separate outcomes",
+      "detection": {
+        "type": "text_present",
+        "value": "minimum opening deposit",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "description": "The host rejected the request as malformed/invalid input -- real text captured from ?inject=validation's actual response against the open-share route",
+      "detection": {
+        "type": "text_present",
+        "value": "The transaction could not be completed as entered.",
+        "scope": "page"
+      }
+    }
+  ],
+  "guardrails": {
+    "allowlist_routes": [
+      "/signon",
+      "/menu",
+      "/members",
+      "/members/*"
+    ],
+    "allowed_action_types": [
+      "select",
+      "type",
+      "click",
+      "extract"
+    ],
+    "requires_confirmation": true
+  },
+  "evidence_policy": {
+    "screenshot_on": [
+      "checkpoint_failure",
+      "hard_failure"
+    ],
+    "redact_fields": [
+      "password",
+      "E-mail",
+      "Phone",
+      "Address",
+      "Share ID",
+      "New Share ID"
+    ]
+  },
+  "escalation_policy": {
+    "default": {
+      "on_checkpoint_failure": {
+        "retry": 2,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": "escalate",
+      "on_step_timeout": {
+        "retry": 1,
+        "then": "escalate"
+      },
+      "on_hard_failure": "escalate"
+    }
+  }
+}

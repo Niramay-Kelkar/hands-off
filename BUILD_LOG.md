@@ -1281,3 +1281,68 @@ row-based match on the same field too, since `inner_text()` on a
 — confirmed visually, no layout defect).
 
 **Committed:** pending.
+
+---
+
+## 2026-08-27 — MERIDIAN Open New Share capability
+
+Lighter build, reusing label_proximity/select/redaction/step_overrides
+machinery already in place — no permission wall for `teller1` (unlike
+Place Account Hold), so this is structurally closer to Funds Transfer.
+
+**Explored first**: `* Share Type` is a 4-option generic type-code
+`<select>` (`S0001 - Regular Shares` / `S0070 - Share Draft (Checking)`
+/ `MMKT - Money Market` / `CERT - Certificate`) shared across every
+member, not a per-member Share ID — checked directly per the task's ask
+("don't assume it won't"), confirmed no redaction/discovery conflict:
+the full standard redact_fields set (including `Share ID`) applied with
+no exclusion needed. Real minimum-deposit rejections captured live and
+found to vary by share type — Regular Shares' minimum is $5.00,
+Certificate's is $500.00 (`"Certificates require a minimum opening
+deposit of $500.00."` vs `"A minimum opening deposit of $5.00 is
+required."`) — both share the substring `"minimum opening deposit"`,
+which `MINIMUM_DEPOSIT_NOT_MET`'s detection matches on rather than
+enumerating a rejection per share type.
+
+**A real, separate redaction gap found here, distinct from the
+`_find_column_fields` bug above**: the post-submit confirmation page's
+label is `"New Share ID:"`, not `"Share ID:"` — a different label
+entirely, so the existing `Share ID` entry never matched it via any
+path. Tracing why revealed the ROW-based path's own match comparison
+had a latent bug: it joined the CELL's normalized label with
+underscores before comparing against `wanted`, but `wanted` itself was
+never joined the same way (kept natural spaced text like `"share id"`)
+— so a multi-word natural-text `redact_fields` entry could never match
+via that path, regardless of what was declared. This had gone
+unnoticed because every prior MERIDIAN-specific entry (`E-mail`,
+`Phone`, `Address`) was a single word, where the bug is invisible.
+Fixed with a shared `normalize_label()` helper (lowercase, collapse
+whitespace AND underscores to one space) used consistently by all
+three detection paths — `account_number`-style pre-joined entries and
+natural spaced entries like `"New Share ID"` now both match either way.
+Re-verified non-regressing against the member detail Share ID column,
+Transfer's From/To Share selects, and Place Account Hold's Share
+select. `open_new_share.policy.json`'s own `evidence_policy.redact_fields`
+adds `New Share ID` alongside the task's literal 5-field baseline — a
+deliberate deviation, flagged: leaving it off would leave a real
+per-member account identifier unredacted on this capability's own
+confirmation screen.
+
+Discovered and replay-tested for real: happy path (`teller1`, Regular
+Shares, $50.00 → `CN480004`/`CN480005` across discovery + replay);
+`MINIMUM_DEPOSIT_NOT_MET` business outcome (Regular Shares, $1.00 →
+`"A minimum opening deposit of $5.00 is required."`); `?inject=validation`
+confirmed real, matches the shared `VALIDATION_ERROR` text.
+`?inject=permission` also returns a `SUPERVISOR OVERRIDE REQUIRED` page
+here, but confirmed live that `teller1` completes the ENTIRE real flow
+(including the actual post) with no natural permission wall anywhere —
+unlike Place Account Hold, this inject doesn't correspond to any real
+restriction for this capability, so no `step_overrides`/escalation
+branch was added for it.
+
+Evidence under `evidence/meridian/open_new_share/`: `discovery/` (with
+its own `summary.txt` covering the two findings above),
+`replays/success/`, `replays/minimum_deposit_not_met/`,
+`injects/summary.txt`.
+
+**Committed:** pending.

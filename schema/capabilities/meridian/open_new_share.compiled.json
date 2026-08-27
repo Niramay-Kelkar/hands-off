@@ -1,0 +1,744 @@
+{
+  "schema_version": "1.0",
+  "capability_id": "meridian_open_new_share",
+  "version": 1,
+  "description": "Sign on to MERIDIAN CORE, open a new share for a member with a chosen share type and initial deposit, and post it for real.",
+  "created_at": "2026-08-27T11:04:32.197665Z",
+  "created_by": "agent.compile",
+  "source_run_id": "discover_20260827T110213Z_d2802f",
+  "target": {
+    "app": "meridian_core",
+    "entry_point": "https://web-sample.interface-hiring.com/signon",
+    "surface_type": "web_legacy"
+  },
+  "risk_class": "mutating",
+  "inputs": [
+    {
+      "name": "operator_id",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'operator_id' (from discovery run discover_20260827T110213Z_d2802f)"
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'password' (from discovery run discover_20260827T110213Z_d2802f)"
+    },
+    {
+      "name": "branch",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'branch' (from discovery run discover_20260827T110213Z_d2802f)"
+    },
+    {
+      "name": "member_id",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'member_id' (from discovery run discover_20260827T110213Z_d2802f)"
+    },
+    {
+      "name": "share_type",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'share_type' (from discovery run discover_20260827T110213Z_d2802f)"
+    },
+    {
+      "name": "initial_deposit",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'initial_deposit' (from discovery run discover_20260827T110213Z_d2802f)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "confirmation_number",
+      "type": "string",
+      "description": "Value captured via extract as 'confirmation_number'"
+    }
+  ],
+  "expected_outcomes": [
+    {
+      "code": "INVALID_CREDENTIALS",
+      "description": "The operator ID/password/branch combination was rejected by the sign-on form",
+      "detection": {
+        "type": "text_present",
+        "conditions": null,
+        "value": "Invalid operator ID or password.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "MINIMUM_DEPOSIT_NOT_MET",
+      "description": "The requested initial deposit is below the minimum required for the chosen share type -- real text captured from a live $1.00 deposit on a Regular Shares share ('A minimum opening deposit of $5.00 is required.') and a $50.00 deposit on a Certificate share ('Certificates require a minimum opening deposit of $500.00.'); both share the substring matched here, since per-share-type minimums are not enumerated as separate outcomes",
+      "detection": {
+        "type": "text_present",
+        "conditions": null,
+        "value": "minimum opening deposit",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "description": "The host rejected the request as malformed/invalid input -- real text captured from ?inject=validation's actual response against the open-share route",
+      "detection": {
+        "type": "text_present",
+        "conditions": null,
+        "value": "The transaction could not be completed as entered.",
+        "scope": "page"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "step_id": 1,
+      "description": "Select '{{branch}}' in role='combobox' name='Branch'",
+      "action": {
+        "type": "select",
+        "value": "{{branch}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "Branch"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "text_present",
+            "conditions": null,
+            "value": "Operator ID:",
+            "scope": "page"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 2,
+      "description": "Type into role='textbox' name='Operator ID'",
+      "action": {
+        "type": "type",
+        "value": "{{operator_id}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "Operator ID"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "text_present",
+            "conditions": null,
+            "value": "Password:",
+            "scope": "page"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 3,
+      "description": "Type into role='textbox' name='Password'",
+      "action": {
+        "type": "type",
+        "value": "{{password}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "Password"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "button",
+            "name": "Sign On"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 4,
+      "description": "Click role='button' name='Sign On'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "button",
+            "name": "Sign On"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Sign On"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "link",
+            "name": "Member Inquiry"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 5,
+      "description": "Click role='link' name='Member Inquiry'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "link",
+            "name": "Member Inquiry"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Member Inquiry"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "text_present",
+            "conditions": null,
+            "value": "Value:",
+            "scope": "page"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 6,
+      "description": "Type into role='textbox' name='Value'",
+      "action": {
+        "type": "type",
+        "value": "{{member_id}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "Value"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "button",
+            "name": "Search"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 7,
+      "description": "Click role='button' name='Search'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "button",
+            "name": "Search"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Search"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "link",
+            "name": "Select"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 8,
+      "description": "Click role='link' name='Select'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "link",
+            "name": "Select"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Select"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "link",
+            "name": "Open New Share"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 9,
+      "description": "Click role='link' name='Open New Share'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "link",
+            "name": "Open New Share"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Open New Share"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "text_present",
+            "conditions": null,
+            "value": "Share Type:",
+            "scope": "page"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 10,
+      "description": "Select '{{share_type}}' in role='combobox' name='* Share Type'",
+      "action": {
+        "type": "select",
+        "value": "{{share_type}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "* Share Type"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "text_present",
+            "conditions": null,
+            "value": "Initial Deposit:",
+            "scope": "page"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 11,
+      "description": "Type into role='textbox' name='* Initial Deposit'",
+      "action": {
+        "type": "type",
+        "value": "{{initial_deposit}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "* Initial Deposit"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "button",
+            "name": "Continue"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 12,
+      "description": "Click role='button' name='Continue'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "button",
+            "name": "Continue"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Continue"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "button",
+            "name": "Open Share"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 13,
+      "description": "Click role='button' name='Open Share'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "button",
+            "name": "Open Share"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Open Share"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "cell",
+            "name": "Confirmation:"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MINIMUM_DEPOSIT_NOT_MET",
+              "VALIDATION_ERROR"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 14,
+      "description": "Read final outputs",
+      "action": {
+        "type": "extract",
+        "value": null,
+        "fields": [
+          {
+            "output": "confirmation_number",
+            "locator": {
+              "strategies": [
+                {
+                  "kind": "accessibility",
+                  "priority": 1,
+                  "role": "cell",
+                  "name_matches": "^Confirmation:"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "locator": null,
+      "wait": null,
+      "checkpoint": {
+        "type": "outputs_non_empty",
+        "conditions": null,
+        "fields": [
+          "confirmation_number"
+        ]
+      },
+      "escalation_override": null
+    }
+  ],
+  "guardrails": {
+    "allowlist_routes": [
+      "/signon",
+      "/menu",
+      "/members",
+      "/members/*"
+    ],
+    "allowed_action_types": [
+      "select",
+      "type",
+      "click",
+      "extract"
+    ],
+    "requires_confirmation": true
+  },
+  "evidence_policy": {
+    "screenshot_on": [
+      "checkpoint_failure",
+      "hard_failure"
+    ],
+    "redact_fields": [
+      "password",
+      "E-mail",
+      "Phone",
+      "Address",
+      "Share ID",
+      "New Share ID"
+    ]
+  },
+  "escalation_policy": {
+    "default": {
+      "on_checkpoint_failure": {
+        "retry": 2,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_step_timeout": {
+        "retry": 1,
+        "then": "escalate"
+      },
+      "on_hard_failure": {
+        "retry": 0,
+        "then": "escalate"
+      }
+    }
+  }
+}
