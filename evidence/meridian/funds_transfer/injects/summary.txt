@@ -1,35 +1,19 @@
 === inject=validation ===
 URL: https://web-sample.interface-hiring.com/members/100234/transfer?inject=validation
 HTTP status: 400
-MERIDIAN CORE   Member Services Platform   v4.2.1
-Cornerstone Financial Systems™
-
-Main Menu  ·  Member Inquiry  ·  System Settings  ·  Sign Off
-
 TRANSACTION REJECTED
-
 The transaction could not be completed as entered. Please review the field values and resubmit.
-
-Return to previous screen
-
-OPR TELLER1  |  BR MAIN-001  |  08/27/2026 07:33:24  |  SID B2C87823
-F3=Sign Off   F5=Main Menu   F7=Member Inquiry   F12=Cancel
 
 === inject=maintenance ===
 URL: https://web-sample.interface-hiring.com/members/100234/transfer?inject=maintenance
 HTTP status: 503
-MERIDIAN CORE   Member Services Platform   v4.2.1
-Cornerstone Financial Systems™
-
-Main Menu  ·  Member Inquiry  ·  System Settings  ·  Sign Off
-
 SCHEDULED MAINTENANCE IN PROGRESS
-
 The host is temporarily unavailable while nightly batch posting completes.
 This window normally clears within a few moments.
 
-Continue
-
-OPR TELLER1  |  BR MAIN-001  |  08/27/2026 07:33:25  |  SID B2C87823
-F3=Sign Off   F5=Main Menu   F7=Member Inquiry   F12=Cancel
-
+Also observed live and unprompted (no ?inject= param at all) during this
+task's own testing: the same "SCHEDULED MAINTENANCE IN PROGRESS" page,
+appearing organically and clearing on its own ~15-30s later. This is a
+real, periodic condition of the sandbox, not just a test-only hook --
+strengthens the case that it is genuinely a "recoverable condition" per
+the outcome taxonomy, not something to special-case as a business outcome.

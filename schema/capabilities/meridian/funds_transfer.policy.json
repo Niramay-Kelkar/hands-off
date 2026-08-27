@@ -30,6 +30,15 @@
         "value": "Source share is HOLD and cannot be debited.",
         "scope": "page"
       }
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "description": "The host rejected the transfer as malformed/invalid input -- real text captured from ?inject=validation's actual response, a distinct rendering path from the INSUFFICIENT_FUNDS/SHARE_ON_HOLD 'could not be validated:' review-step rejections",
+      "detection": {
+        "type": "text_present",
+        "value": "The transaction could not be completed as entered.",
+        "scope": "page"
+      }
     }
   ],
   "guardrails": {
@@ -72,6 +81,26 @@
         "then": "escalate"
       },
       "on_hard_failure": "escalate"
+    }
+  },
+  "step_overrides": {
+    "15": {
+      "on_checkpoint_failure": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_step_timeout": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_hard_failure": {
+        "retry": 0,
+        "then": "escalate"
+      }
     }
   }
 }
