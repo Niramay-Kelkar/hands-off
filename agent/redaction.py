@@ -87,6 +87,21 @@ def _find_column_fields(page: Page, wanted: set[str]) -> list[SensitiveField]:
             continue
 
         header_cells = rows.nth(0).locator("xpath=./td | ./th")
+        # A genuine data grid in this app always has 3+ columns (e.g. the
+        # member detail page's "Share ID | Type | Balance | Status"); a
+        # 2-column table is a vertical label:value FORM (e.g. Funds
+        # Transfer's "From Share:" / <select> row), where column 0 across
+        # every row is a different field's LABEL, not one column's worth of
+        # per-row data. Without this guard, a redact_fields entry like
+        # "From Share" both correctly matches the select-detection path
+        # below AND wrongly matches here as a "column header", making this
+        # path walk column 0 of every subsequent row -- i.e. grab "To
+        # Share:"/"Amount:"/"Memo:"'s own label cells as if they were
+        # sensitive per-row values in a "From Share" column. Found live via
+        # a screenshot masking the label column instead of the value
+        # column on the Funds Transfer form.
+        if header_cells.count() < 3:
+            continue
         for col in range(header_cells.count()):
             header_text = header_cells.nth(col).inner_text().strip()
             normalized = header_text.lower()

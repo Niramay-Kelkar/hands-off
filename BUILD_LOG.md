@@ -1103,3 +1103,58 @@ and re-verified with fresh live evidence — see the next entry, which is
 the actual fix and the evidence for both changes together.
 
 **Committed:** pending.
+
+---
+
+## 2026-08-27 — Fix: `_find_column_fields` mis-fired on the new "From Share"/"To Share" entries
+
+User spot-checked `evidence/meridian/funds_transfer/discovery_redaction_check/screenshots/step_15_step.png`
+from the exact-match redaction change above and caught a real defect: a
+huge black box covering the *label* column ("To Share:", "Amount:",
+"Memo:" text itself, not their values) rather than just the "To Share"
+select's value box.
+
+**Root cause:** `_find_column_fields` (the column-header detection path,
+for grids like the member detail page's "Share ID | Type | Balance |
+Status") normalizes a header cell's text by stripping a trailing `:`
+before matching against `redact_fields` — meant to tolerate either
+header style. The Funds Transfer form's own field table is a 2-column
+vertical label:value form (row 0 = `"From Share:"` / `<select>`, row 1 =
+`"To Share:"` / `<select>`, etc.) — structurally a table with a "header"
+row too, from this function's point of view. Adding `"From Share"` as a
+`redact_fields` entry (for the *select* detection path, intentionally)
+also made it an exact match for THIS function's header-normalization,
+which then treated column 0 across every subsequent row as "data in the
+From Share column" — i.e. grabbed `"To Share:"`, `"Amount:"`, `"Memo:"`'s
+own label cells as if they were per-row sensitive values, and masked
+those cells' bounding boxes instead.
+
+**Fix:** `_find_column_fields` now skips any table whose header row has
+fewer than 3 columns. Verified this cleanly separates the two real
+shapes in this app: the member detail page's genuine grid has 4 columns
+(`Share ID | Type | Balance | Status`); every vertical label:value form
+table (Funds Transfer, Place Account Hold) has exactly 2. Re-ran
+`find_sensitive_fields` directly against both live pages: Funds
+Transfer now returns only `from_share`/`to_share` entries (58 = 29
+options × 2 selects, all correctly positioned over the value column,
+label column untouched); the member detail page's Share ID column
+still returns all 27 rows correctly (unaffected, non-regressing).
+
+**Re-verified with a fresh real discovery run**
+(`evidence/meridian/funds_transfer/discovery_redaction_check/`,
+replacing the broken evidence): screenshot now shows clean label text
+next to two correctly-boxed select values; 117 `[REDACTED]` occurrences
+(matching the count from before the select-detection path existed at
+all, confirming the row-based over-masking artifact — which had
+inflated the prior broken run's count to 133 — is gone).
+
+Also spot-checked, since `place_account_hold`'s own policy adds a
+`"Share"` entry for the same select-detection path: the Hold form is
+also a 2-column table, so it was never at risk of this specific
+mis-fire either way — confirmed directly against the live page (only
+`share` entries returned, correctly positioned; a harmless redundant
+row-based match on the same field, since `inner_text()` on a `<select>`
+returns all option text and the label cell literally reads `"Share:"`,
+masks the same value-column region, not the labels).
+
+**Committed:** pending.
