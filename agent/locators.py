@@ -75,8 +75,21 @@ def _css(scope: Page, strategy: LocatorStrategyModel, params: dict[str, str]) ->
 @LOCATOR_REGISTRY.register("label_proximity")
 def _label_proximity(scope: Page, strategy: LocatorStrategyModel, params: dict[str, str]) -> Locator:
     label = substitute(get_field(strategy, "label"), params)
-    row = scope.locator(f"tr:has-text({label!r})").first
-    return row.locator("input, select, textarea").first
+    # A plain `tr:has-text(label)` also matches an outer wrapping row whose
+    # accessible/text content concatenates every field's label (e.g. a whole
+    # sign-on panel row containing both "Operator ID:" and "Password:") --
+    # `.first` on that would pick the ANCESTOR row, whose first descendant
+    # input is always the first field on the form, silently returning the
+    # wrong element for every field but the first. Prefer an exact row-name
+    # match (with, then without, a trailing colon) to land on the specific
+    # single-field row; only fall back to the old substring scan for a
+    # layout where no row carries that exact accessible name.
+    row = scope.get_by_role("row", name=f"{label}:", exact=True)
+    if row.count() == 0:
+        row = scope.get_by_role("row", name=label, exact=True)
+    if row.count() == 0:
+        row = scope.locator(f"tr:has-text({label!r})")
+    return row.first.locator("input, select, textarea").first
 
 
 def resolve_locator(
