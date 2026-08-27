@@ -1073,3 +1073,33 @@ reason above, so the actual proof this fix works is the next GitHub
 Actions run, not local verification.
 
 **Committed:** pending.
+
+---
+
+## 2026-08-27 — Redaction: exact-match select/option detection
+
+**Redaction tightening.** `_find_select_option_fields` (`agent/redaction.py`)
+previously matched a `<select>`'s enclosing row label against
+`redact_fields` by word overlap ("From Share" / "To Share" both contain
+"share", so they matched a bare "Share ID" entry) — looser than every
+other detection path in the module, which all do exact normalized-string
+matching. Changed to exact match: normalize the label (lowercase, strip
+trailing `:`, collapse whitespace) and require it to equal an entry in
+`redact_fields` exactly. This requires the caller to declare a field
+under the label it actually appears as, so
+`schema/capabilities/meridian/funds_transfer.policy.json` gained
+explicit `"From Share"` / `"To Share"` entries alongside the existing
+`"Share ID"` (used by the column-header path on the member detail
+page). Recompiled `funds_transfer.compiled.json` from its original
+`source_run_id` with the updated policy — diffed against the prior
+compiled artifact and confirmed the *only* change is the
+`evidence_policy.redact_fields` list gaining the two new entries; every
+step/locator/checkpoint is byte-identical.
+
+This change had a real, non-obvious regression — `_find_column_fields`
+started mis-firing on the very same new `redact_fields` entries,
+producing a visibly broken masked screenshot. Caught in review, fixed,
+and re-verified with fresh live evidence — see the next entry, which is
+the actual fix and the evidence for both changes together.
+
+**Committed:** pending.

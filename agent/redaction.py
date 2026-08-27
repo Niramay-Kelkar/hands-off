@@ -116,13 +116,16 @@ def _find_select_option_fields(page: Page, wanted: set[str]) -> list[SensitiveFi
     to the whole <select>, not a value), and there's no <table> at all for
     the column-header path to scan.
 
-    Matching is by word overlap between the enclosing row's label and a
-    redact_fields entry (e.g. row label "From Share" / "To Share" and
-    config entry "Share ID" both contain "share"), not an exact-string
-    match like the two paths above -- deliberately looser, since the
-    field being selected (a specific share) and the identifier concept
-    being protected (its Share ID) are two different phrasings of the
-    same underlying data, not the same label text repeated. Each
+    Matching is exact (normalized) string equality between the enclosing
+    row's label and a redact_fields entry -- the same convention every
+    other detection path in this module already uses. This requires the
+    caller to declare the field under the label it actually appears as
+    (e.g. "From Share" and "To Share" as their own redact_fields entries,
+    alongside "Share ID" for the column-header path), rather than relying
+    on word-overlap ("Share ID" matching "From Share" because both
+    contain "share") -- overlap is looser than intended and can both
+    over-match (any other "... Share ..." labelled control) and give a
+    false sense of coverage from a single declared entry. Each
     option's identifier is its `value` attribute (e.g.
     `<option value="100234-S0001">100234-S0001 - Regular Shares
     ($1,500.00)</option>`) -- exact and unambiguous, unlike parsing it
@@ -139,12 +142,13 @@ def _find_select_option_fields(page: Page, wanted: set[str]) -> list[SensitiveFi
         if label_cell.count() == 0:
             continue
         label_text = label_cell.first.inner_text().strip().lower()
-        label_words = set(re.findall(r"[a-z]+", label_text))
-        matched_phrase = next((phrase for phrase in wanted if label_words & set(phrase.split())), None)
-        if matched_phrase is None:
+        if label_text.endswith(":"):
+            label_text = label_text[:-1].strip()
+        normalized_label = re.sub(r"\s+", " ", label_text)
+        if normalized_label not in wanted:
             continue
 
-        field_name = re.sub(r"\s+", "_", matched_phrase)
+        field_name = re.sub(r"\s+", "_", normalized_label)
         options = select.locator("option")
         for j in range(options.count()):
             opt = options.nth(j)
