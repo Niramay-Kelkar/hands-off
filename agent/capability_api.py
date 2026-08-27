@@ -42,6 +42,11 @@ CAPABILITIES_DIR = Path("schema/capabilities")
 OPERATOR_CONSOLE_URL = os.environ.get("OPERATOR_CONSOLE_URL", "http://127.0.0.1:8100")
 SELF_URL = os.environ.get("CAPABILITY_API_URL", "http://127.0.0.1:8200")
 CHAT_MODEL = os.environ.get("CHAT_MODEL", "claude-sonnet-5")
+# Optional comma-separated allowlist of capability_ids the chatbot may offer.
+# Unset -> the chatbot sees the whole catalog. Set it to scope a demo to one
+# family of capabilities (e.g. the MERIDIAN set) so the model can't pick a
+# same-sounding capability whose backing system isn't running.
+CHAT_CAPABILITIES = [c.strip() for c in os.environ.get("CHAT_CAPABILITIES", "").split(",") if c.strip()]
 
 app = Flask(__name__)
 
@@ -383,6 +388,8 @@ def chat():
 
     session = _chat_sessions.setdefault(session_id, {"history": [], "pending": None})
     catalog = _scan_capabilities()
+    if CHAT_CAPABILITIES:
+        catalog = {k: v for k, v in catalog.items() if k in CHAT_CAPABILITIES}
     tools = _tools_from_catalog(catalog)
 
     pending = session.get("pending")
