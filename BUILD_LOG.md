@@ -1158,3 +1158,126 @@ returns all option text and the label cell literally reads `"Share:"`,
 masks the same value-column region, not the labels).
 
 **Committed:** pending.
+
+---
+
+## 2026-08-27 — MERIDIAN Place Account Hold capability
+
+**Explored before building, per the task.** Wrote
+`scripts/recon_place_hold.py` (same throwaway, no-LLM style as
+`scripts/recon_meridian.py`) and ran it for real against both `teller1`
+and `super1`. Finding (full transcript + screenshots in
+`evidence/meridian/place_account_hold/exploration/`): this is a HARD
+REJECTION, not an in-context supervisor-override prompt. The hold form
+itself is visible to a non-supervisor (with a static "RESTRICTED
+FUNCTION - SUPERVISOR OVERRIDE REQUIRED" warning banner in its heading,
+but no interactive override control anywhere on the page); clicking
+Continue as `teller1` lands on a dedicated rejection page instead of the
+review screen — "SUPERVISOR OVERRIDE REQUIRED / Operator profile
+teller1 is not authorized to perform this function. A supervisor must
+sign on to complete this request." (HTTP 403), whose only affordance is
+"Return to previous screen." The only way forward is a real sign-off/
+sign-on cycle to a supervisor operator. This directly determined the
+escalation design below — a resolvable in-session privilege gap
+escalates, per the existing design decision, rather than being modeled
+as a business outcome.
+
+**Built the capability.** Discovery (as `super1`, the only path that can
+reach a successful `done` trajectory — `teller1` cannot complete this
+flow at all) against the real Place Account Hold form: sign on, click
+Place Account Hold, search/select member 100234, select `* Share` and
+`* Reason Code`, type `Notes`, Continue to the `CONFIRM ACCOUNT HOLD`
+review screen, Apply Hold, extract the confirmation. Real hold placed
+for real during discovery itself (`CN480444`). Per the task, `Share ID`
+was deliberately omitted from `--redact-fields` for this one discovery
+run only (the model needs to read real share IDs/statuses to choose an
+OPEN share) — `E-mail`/`Phone`/`Address` stayed redacted throughout.
+The compiled policy's own `evidence_policy.redact_fields` keeps `Share
+ID` *and* a new `Share` entry (needed because this form's single select
+label is exactly `"Share"`, not `"From Share"`/`"To Share"`) regardless
+— replay never re-observes the page, so it has none of discovery's
+read-the-page-to-select-a-value tension.
+
+`schema/capabilities/meridian/place_account_hold.policy.json`:
+`risk_class: mutating`, `requires_confirmation: true`; expected_outcomes
+`INVALID_CREDENTIALS` (shared sign-on rejection text) and
+`VALIDATION_ERROR` (real text from `?inject=validation` against the
+hold route — see below); `step_overrides["12"]` (the compiled step_id
+for the "Continue" click that submits the hold form — the actual
+permission-boundary step) set to `retry: 0, then: escalate` on every
+trigger, so a checkpoint failure there — the only way this step can
+fail — always escalates immediately rather than retrying uselessly
+against a wall that a retry can't fix.
+
+**`?inject=` recon against the hold route**
+(`evidence/meridian/place_account_hold/injects/summary.txt`):
+`?inject=permission` (403) is byte-identical (module the operator name)
+to the real, unforced `teller1` rejection — confirmed no separate
+handling is needed, since it exercises the exact same
+checkpoint-failure/step_overrides path. `?inject=validation` (400,
+"TRANSACTION REJECTED" / "The transaction could not be completed as
+entered.") is the same shared host-level rejection text
+`funds_transfer`'s `VALIDATION_ERROR` uses, added as this capability's
+own `VALIDATION_ERROR` outcome. `?inject=maintenance` (503) left
+unmodeled, same reasoning as `funds_transfer`'s (a genuinely recoverable
+condition, not a business outcome, needing engine-level retry timing
+out of scope here). `?inject=notfound` isn't reachable at any step this
+capability actually executes (member selection happens earlier).
+
+**Tested for real, all the way through `agent.replay` (not just
+discovery), via a driver script mirroring
+`.github/scripts/check_escalation_lifecycle.py`'s CDP-attach pattern**
+(`AGENT_CDP_PORT`, a second Playwright process attached to the SAME live
+browser standing in for the human operator, the real
+`agent.operator_console` `/resume/<run_id>` endpoint for every resume):
+
+- **Happy path, `super1`, share `100234-MMKT-28`:** risk-gate pause ->
+  resume -> `status: "success"`, `hold_confirmation: "CN480445"` — a
+  real hold, confirmed live.
+- **`teller1`, share `100234-CERT-27`:** risk-gate pause -> resume ->
+  step 12 executes, checkpoint fails (lands on the rejection page, not
+  the review screen), escalates immediately per `step_overrides`
+  (`sessions.db`: `status=paused`, `current_step_id=12`,
+  `pause_reason=on_checkpoint_failure`, real screenshot saved). The
+  human recovery this time is NOT a same-identity fix like Transfer's
+  dialog-dismiss — it's a real sign-off (`teller1`) / sign-on (`super1`)
+  cycle in the SAME live session, then re-navigating and re-filling the
+  hold form up to the review screen, so step 12's ORIGINAL checkpoint
+  (`Apply Hold` visible) becomes true without the engine ever re-running
+  step 12's own action (per the ACT/SETTLE/CHECK split). Resumed ->
+  the engine's own CHECK-phase retry sees the checkpoint now pass and
+  continues automatically to step 13, where the AUTOMATION (not the
+  human) clicks `Apply Hold` and completes the real POST ->
+  `status: "success"`, `hold_confirmation: "CN480446"`. Full narrative
+  in `evidence/meridian/place_account_hold/escalation/note.txt`.
+
+Curated evidence under `evidence/meridian/place_account_hold/`:
+`exploration/` (the recon transcript + before/after screenshots for
+both operators), `discovery/` (the real successful `super1` trajectory),
+`replays/success/` and `escalation/` (the two `agent.replay` runs above,
+logs + screenshots + result JSON), `injects/summary.txt`.
+
+**One thing user-flagged during review, checked and confirmed NOT a bug:**
+`evidence/meridian/place_account_hold/discovery/screenshots/` showing
+Share ID and Reason Code in plain text is the direct, explicit result
+of the task's own instruction (c): `Share ID` was deliberately omitted
+from `--redact-fields` for that one discovery run only, because the
+model needs to read real share IDs/statuses to select one — the same
+tradeoff already documented for `funds_transfer`'s own original
+discovery evidence (also unredacted for Share ID, same reason).
+Confirmed E-mail/Phone/Address (which stayed in `--redact-fields`
+throughout) never appear anywhere in this trajectory at all (the Place
+Hold flow never visits the member detail page), so there's nothing
+silently leaking beyond the one deliberate, documented exception.
+Separately confirmed the *compiled* policy's `evidence_policy.redact_fields`
+(`Share ID` + `Share`, used at replay time, which never has this
+discovery-time conflict) correctly masks the Hold form's `<select>` when
+exercised directly against the live page — the 3-column guard above
+doesn't regress it (the Hold form is also a 2-column table, so it was
+never at risk of the same mis-fire; there's a harmless redundant
+row-based match on the same field too, since `inner_text()` on a
+`<select>` returns all option text and the label cell literally reads
+`"Share:"`, but it masks the same value-column region, not the labels
+— confirmed visually, no layout defect).
+
+**Committed:** pending.

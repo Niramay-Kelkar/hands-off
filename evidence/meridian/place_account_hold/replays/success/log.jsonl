@@ -1,0 +1,46 @@
+{"ts": "2026-08-27T10:13:02.622065+00:00", "kind": "run_start", "capability_id": "meridian_place_account_hold", "version": 1, "params": {"operator_id": "super1", "password": "[REDACTED]", "branch": "MAIN-001 - Main Office", "member_id": "100234", "share": "[REDACTED]", "reason_code": "LEGAL - Legal / levy", "notes": "replay happy-path test"}}
+{"ts": "2026-08-27T10:13:08.179856+00:00", "kind": "risk_gate_pause", "risk_class": "mutating", "requires_confirmation": true, "screenshot": "evidence/runs/meridian_place_account_hold_20260827T101302Z_3861a6/screenshots/step_0_risk_confirmation_required.png"}
+{"ts": "2026-08-27T10:13:09.243764+00:00", "kind": "risk_gate_resumed"}
+{"ts": "2026-08-27T10:13:09.337644+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:09.417496+00:00", "kind": "action", "type": "select", "value": "MAIN-001 - Main Office"}
+{"ts": "2026-08-27T10:13:10.479718+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:10.553015+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:10.636448+00:00", "kind": "action", "type": "type", "value": "super1"}
+{"ts": "2026-08-27T10:13:11.713653+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:11.793099+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:11.868206+00:00", "kind": "action", "type": "type", "value": "password"}
+{"ts": "2026-08-27T10:13:12.931857+00:00", "kind": "checkpoint", "step_id": 3, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:13.001611+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:13.409716+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:14.494943+00:00", "kind": "checkpoint", "step_id": 4, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:14.559364+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:14.841951+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:15.896521+00:00", "kind": "checkpoint", "step_id": 5, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:15.957440+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:16.019161+00:00", "kind": "action", "type": "type", "value": "100234"}
+{"ts": "2026-08-27T10:13:17.062432+00:00", "kind": "checkpoint", "step_id": 6, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:17.104874+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:17.359290+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:18.463254+00:00", "kind": "checkpoint", "step_id": 7, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:18.572289+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:18.896869+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:20.041410+00:00", "kind": "checkpoint", "step_id": 8, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:20.174642+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:20.299860+00:00", "kind": "action", "type": "select", "value": "[REDACTED] - Money Market"}
+{"ts": "2026-08-27T10:13:21.430611+00:00", "kind": "checkpoint", "step_id": 9, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:21.554136+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:21.682299+00:00", "kind": "action", "type": "select", "value": "LEGAL - Legal / levy"}
+{"ts": "2026-08-27T10:13:22.814186+00:00", "kind": "checkpoint", "step_id": 10, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:22.935997+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:23.071960+00:00", "kind": "action", "type": "type", "value": "replay happy-path test"}
+{"ts": "2026-08-27T10:13:24.230171+00:00", "kind": "checkpoint", "step_id": 11, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:24.346359+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:24.579822+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:25.646498+00:00", "kind": "checkpoint", "step_id": 12, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:25.692994+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:25.898959+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:26.966149+00:00", "kind": "checkpoint", "step_id": 13, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:27.009534+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:27.062841+00:00", "kind": "action", "type": "extract", "output": "hold_confirmation", "strategy_kind": "accessibility"}
+{"ts": "2026-08-27T10:13:28.117531+00:00", "kind": "checkpoint", "step_id": 14, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:28.159900+00:00", "kind": "run_end", "status": "success"}

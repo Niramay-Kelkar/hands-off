@@ -1,0 +1,73 @@
+?inject= exploration against the Place Account Hold route, real requests
+against https://web-sample.interface-hiring.com, signed on as super1.
+
+--- ?inject=permission ---
+GET /members/100234/hold?inject=permission -> HTTP 403
+
+  SUPERVISOR OVERRIDE REQUIRED
+
+  Operator profile super1 is not authorized to perform this function.
+  A supervisor must sign on to complete this request.
+
+  Return to previous screen
+
+This is BYTE-IDENTICAL (modulo the operator name substitution) to the
+real, unforced rejection a non-supervisor operator (teller1) hits
+naturally when attempting to submit the hold form -- same heading, same
+sentence template, same 403 status, same "Return to previous screen"
+link, no "Apply Hold" button. Confirmed by direct comparison against
+evidence/meridian/place_account_hold/escalation/screenshots/
+step_12_on_checkpoint_failure.png (teller1's real, non-injected
+rejection).
+
+Conclusion: ?inject=permission does NOT need separate handling. It
+exercises the exact same code path meridian_place_account_hold.compiled.json's
+step 12 checkpoint (element_visible("Apply Hold") / outcome_match) and
+step_overrides.12 (retry:0, escalate) already cover -- a checkpoint
+failure at that step escalates immediately regardless of whether the
+rejection was hit organically (wrong operator) or would be forced via
+this query param. No new expected_outcome or escalation branch was
+added for it.
+
+--- ?inject=validation ---
+GET /members/100234/hold?inject=validation -> HTTP 400
+
+  TRANSACTION REJECTED
+
+  The transaction could not be completed as entered. Please review the
+  field values and resubmit.
+
+Same text as meridian_funds_transfer's VALIDATION_ERROR outcome (a
+shared host-level rejection page, not specific to either capability).
+Added as place_account_hold's own VALIDATION_ERROR expected_outcome
+(policy.json), detected the same way.
+
+--- ?inject=maintenance ---
+GET /members/100234/hold?inject=maintenance -> HTTP 503
+
+  SCHEDULED MAINTENANCE IN PROGRESS
+
+  The host is temporarily unavailable while nightly batch posting
+  completes. This window normally clears within a few moments.
+
+  Continue
+
+Same recoverable-condition text/shape as funds_transfer's maintenance
+case. Not modeled as a business outcome for the same reason documented
+there (evidence/meridian/funds_transfer/injects/summary.txt): it's a
+transient wait-and-retry condition, not a legitimate end state, and a
+real fix needs engine.py-level retry timing that's out of scope for
+this task. Left as the default on_checkpoint_failure retry-then-escalate
+fallback -- safe, never silently misclassified.
+
+--- ?inject=notfound ---
+GET /members/100234/hold?inject=notfound -> HTTP 404
+
+  RECORD NOT FOUND
+
+  The requested member record could not be located on this host.
+
+Not reachable at the point this capability's steps actually run (member
+selection happens earlier, via Member Inquiry search/select, before the
+hold form is ever loaded) -- included here for completeness of the
+recon pass, not modeled as an outcome.

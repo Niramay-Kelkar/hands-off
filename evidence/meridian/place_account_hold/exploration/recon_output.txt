@@ -1,0 +1,776 @@
+
+====================================================================================================
+A. AS TELLER1 (non-supervisor)
+====================================================================================================
+
+--- aria_snapshot: main menu after sign-on as teller1 ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - row "MAIN MENU Signed on as J. TELLER (TELLER) 1. Member Inquiry / Selection 2. Funds Transfer 3. Open New Share 4. Update Member Information 5. Place Account Hold 8. System Settings (error injection) 9. Sign Off Type or click a menu option to continue.":
+      - cell "MAIN MENU Signed on as J. TELLER (TELLER) 1. Member Inquiry / Selection 2. Funds Transfer 3. Open New Share 4. Update Member Information 5. Place Account Hold 8. System Settings (error injection) 9. Sign Off Type or click a menu option to continue.":
+        - heading "MAIN MENU" [level=1]
+        - text: Signed on as J. TELLER (TELLER)
+        - table:
+          - rowgroup:
+            - row "1. Member Inquiry / Selection":
+              - cell "1."
+              - cell "Member Inquiry / Selection":
+                - link "Member Inquiry / Selection":
+                  - /url: /members
+            - row "2. Funds Transfer":
+              - cell "2."
+              - cell "Funds Transfer":
+                - link "Funds Transfer":
+                  - /url: /members?next=transfer
+            - row "3. Open New Share":
+              - cell "3."
+              - cell "Open New Share":
+                - link "Open New Share":
+                  - /url: /members?next=open-share
+            - row "4. Update Member Information":
+              - cell "4."
+              - cell "Update Member Information":
+                - link "Update Member Information":
+                  - /url: /members?next=update
+            - row "5. Place Account Hold":
+              - cell "5."
+              - cell "Place Account Hold":
+                - link "Place Account Hold":
+                  - /url: /members?next=hold
+            - row "8. System Settings (error injection)":
+              - cell "8."
+              - cell "System Settings (error injection)":
+                - link "System Settings (error injection)":
+                  - /url: /settings
+            - row "9. Sign Off":
+              - cell "9."
+              - cell "Sign Off":
+                - link "Sign Off":
+                  - /url: /signoff
+        - text: Type or click a menu option to continue.
+    - row "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:15 | SID 568402BF":
+      - cell "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:15 | SID 568402BF"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+
+====================================================================================================
+PLACE ACCOUNT HOLD -- as currently signed-on operator (teller1)
+====================================================================================================
+
+--- aria_snapshot: after clicking Place Account Hold (member selection?) ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "MEMBER INQUIRY / SELECTION Search by: Member Number Value: Search Try member numbers 100234, 100987, 101555, 102777, 103001."':
+      - 'cell "MEMBER INQUIRY / SELECTION Search by: Member Number Value: Search Try member numbers 100234, 100987, 101555, 102777, 103001."':
+        - heading "MEMBER INQUIRY / SELECTION" [level=1]
+        - table:
+          - rowgroup:
+            - 'row "Search by: Member Number"':
+              - cell "Search by:"
+              - cell "Member Number":
+                - combobox:
+                  - option "Member Number" [selected]
+                  - option "Last Name"
+            - 'row "Value: Search"':
+              - cell "Value:"
+              - cell "Search":
+                - textbox
+                - button "Search"
+        - text: Try member numbers 100234, 100987, 101555, 102777, 103001.
+    - row "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:16 | SID 568402BF":
+      - cell "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:16 | SID 568402BF"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+URL after click: https://web-sample.interface-hiring.com/members?next=hold
+
+--- aria_snapshot: member search results ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "MEMBER INQUIRY / SELECTION Search by: Member Number Value: 100234 Search Member No. Name Shares 100234 Lovelace, Ada 28 Select Try member numbers 100234, 100987, 101555, 102777, 103001."':
+      - 'cell "MEMBER INQUIRY / SELECTION Search by: Member Number Value: 100234 Search Member No. Name Shares 100234 Lovelace, Ada 28 Select Try member numbers 100234, 100987, 101555, 102777, 103001."':
+        - heading "MEMBER INQUIRY / SELECTION" [level=1]
+        - table:
+          - rowgroup:
+            - 'row "Search by: Member Number"':
+              - cell "Search by:"
+              - cell "Member Number":
+                - combobox:
+                  - option "Member Number" [selected]
+                  - option "Last Name"
+            - 'row "Value: 100234 Search"':
+              - cell "Value:"
+              - cell "100234 Search":
+                - textbox: "100234"
+                - button "Search"
+        - table:
+          - rowgroup:
+            - row "Member No. Name Shares":
+              - cell "Member No."
+              - cell "Name"
+              - cell "Shares"
+              - cell
+            - row "100234 Lovelace, Ada 28 Select":
+              - cell "100234"
+              - cell "Lovelace, Ada"
+              - cell "28"
+              - cell "Select":
+                - link "Select":
+                  - /url: /members/100234/hold
+        - text: Try member numbers 100234, 100987, 101555, 102777, 103001.
+    - row "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:16 | SID 568402BF":
+      - cell "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:16 | SID 568402BF"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+
+--- aria_snapshot: after selecting member ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "PLACE ACCOUNT HOLD RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED * Share: 100234-S0001 - Regular Shares * Reason Code: FRAUD - Suspected fraud Notes: Continue Cancel"':
+      - 'cell "PLACE ACCOUNT HOLD RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED * Share: 100234-S0001 - Regular Shares * Reason Code: FRAUD - Suspected fraud Notes: Continue Cancel"':
+        - heading "PLACE ACCOUNT HOLD" [level=1]
+        - text: RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED
+        - table:
+          - rowgroup:
+            - 'row "* Share: 100234-S0001 - Regular Shares"':
+              - cell "* Share:"
+              - cell "100234-S0001 - Regular Shares":
+                - combobox:
+                  - option "100234-S0001 - Regular Shares" [selected]
+                  - option "100234-S0070 - Share Draft (Checking)"
+                  - option "100234-S0001-3 - Regular Shares"
+                  - option "100234-MMKT-4 - Money Market"
+                  - option "100234-MMKT-5 - Money Market"
+                  - option "100234-S0001-6 - Regular Shares"
+                  - option "100234-S0001-7 - Regular Shares"
+                  - option "100234-S0001-8 - Regular Shares"
+                  - option "100234-S0001-9 - Regular Shares"
+                  - option "100234-MMKT-10 - Money Market"
+                  - option "100234-S0001-11 - Regular Shares"
+                  - option "100234-S0001-12 - Regular Shares"
+                  - option "100234-MMKT-13 - Money Market"
+                  - option "100234-MMKT-14 - Money Market"
+                  - option "100234-MMKT-15 - Money Market"
+                  - option "100234-S0001-16 - Regular Shares"
+                  - option "100234-S0001-17 - Regular Shares"
+                  - option "100234-S0001-18 - Regular Shares"
+                  - option "100234-S0001-19 - Regular Shares"
+                  - option "100234-S0001-20 - Regular Shares"
+                  - option "100234-S0001-21 - Regular Shares"
+                  - option "100234-S0001-22 - Regular Shares"
+                  - option "100234-S0001-23 - Regular Shares"
+                  - option "100234-S0070-24 - Share Draft (Checking)"
+                  - option "100234-S0070-25 - Share Draft (Checking)"
+                  - option "100234-CERT-26 - Certificate"
+                  - option "100234-CERT-27 - Certificate"
+                  - option "100234-MMKT-28 - Money Market"
+            - 'row "* Reason Code: FRAUD - Suspected fraud"':
+              - cell "* Reason Code:"
+              - cell "FRAUD - Suspected fraud":
+                - combobox:
+                  - option "FRAUD - Suspected fraud" [selected]
+                  - option "LEGAL - Legal / levy"
+                  - option "DECEASED - Member deceased"
+            - row "Notes:":
+              - cell "Notes:"
+              - cell:
+                - textbox
+            - row "Continue Cancel":
+              - cell
+              - cell "Continue Cancel":
+                - button "Continue"
+                - link "Cancel":
+                  - /url: /members/100234
+    - row "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:17 | SID 568402BF":
+      - cell "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:17 | SID 568402BF"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+URL after member select: https://web-sample.interface-hiring.com/members/100234/hold
+
+comboboxes found on this screen: 2
+  combobox[0] currently selected: '100234-S0001 - Regular Shares'
+  combobox[1] currently selected: 'FRAUD - Suspected fraud'
+textboxes found: 1
+
+--- aria_snapshot: hold form filled ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "PLACE ACCOUNT HOLD RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED * Share: 100234-S0070 - Share Draft (Checking) * Reason Code: LEGAL - Legal / levy Notes: recon script -- place hold exploration Continue Cancel"':
+      - 'cell "PLACE ACCOUNT HOLD RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED * Share: 100234-S0070 - Share Draft (Checking) * Reason Code: LEGAL - Legal / levy Notes: recon script -- place hold exploration Continue Cancel"':
+        - heading "PLACE ACCOUNT HOLD" [level=1]
+        - text: RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED
+        - table:
+          - rowgroup:
+            - 'row "* Share: 100234-S0070 - Share Draft (Checking)"':
+              - cell "* Share:"
+              - cell "100234-S0070 - Share Draft (Checking)":
+                - combobox:
+                  - option "100234-S0001 - Regular Shares"
+                  - option "100234-S0070 - Share Draft (Checking)" [selected]
+                  - option "100234-S0001-3 - Regular Shares"
+                  - option "100234-MMKT-4 - Money Market"
+                  - option "100234-MMKT-5 - Money Market"
+                  - option "100234-S0001-6 - Regular Shares"
+                  - option "100234-S0001-7 - Regular Shares"
+                  - option "100234-S0001-8 - Regular Shares"
+                  - option "100234-S0001-9 - Regular Shares"
+                  - option "100234-MMKT-10 - Money Market"
+                  - option "100234-S0001-11 - Regular Shares"
+                  - option "100234-S0001-12 - Regular Shares"
+                  - option "100234-MMKT-13 - Money Market"
+                  - option "100234-MMKT-14 - Money Market"
+                  - option "100234-MMKT-15 - Money Market"
+                  - option "100234-S0001-16 - Regular Shares"
+                  - option "100234-S0001-17 - Regular Shares"
+                  - option "100234-S0001-18 - Regular Shares"
+                  - option "100234-S0001-19 - Regular Shares"
+                  - option "100234-S0001-20 - Regular Shares"
+                  - option "100234-S0001-21 - Regular Shares"
+                  - option "100234-S0001-22 - Regular Shares"
+                  - option "100234-S0001-23 - Regular Shares"
+                  - option "100234-S0070-24 - Share Draft (Checking)"
+                  - option "100234-S0070-25 - Share Draft (Checking)"
+                  - option "100234-CERT-26 - Certificate"
+                  - option "100234-CERT-27 - Certificate"
+                  - option "100234-MMKT-28 - Money Market"
+            - 'row "* Reason Code: LEGAL - Legal / levy"':
+              - cell "* Reason Code:"
+              - cell "LEGAL - Legal / levy":
+                - combobox:
+                  - option "FRAUD - Suspected fraud"
+                  - option "LEGAL - Legal / levy" [selected]
+                  - option "DECEASED - Member deceased"
+            - 'row "Notes: recon script -- place hold exploration"':
+              - cell "Notes:"
+              - cell "recon script -- place hold exploration":
+                - textbox: recon script -- place hold exploration
+            - row "Continue Cancel":
+              - cell
+              - cell "Continue Cancel":
+                - button "Continue"
+                - link "Cancel":
+                  - /url: /members/100234
+    - row "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:17 | SID 568402BF":
+      - cell "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:17 | SID 568402BF"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+
+--- aria_snapshot: after submitting hold form (review or result) ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - row "SUPERVISOR OVERRIDE REQUIRED Operator profile teller1 is not authorized to perform this function. A supervisor must sign on to complete this request. Return to previous screen":
+      - cell "SUPERVISOR OVERRIDE REQUIRED Operator profile teller1 is not authorized to perform this function. A supervisor must sign on to complete this request. Return to previous screen":
+        - text: SUPERVISOR OVERRIDE REQUIRED Operator profile teller1 is not authorized to perform this function. A supervisor must sign on to complete this request.
+        - link "Return to previous screen":
+          - /url: https://web-sample.interface-hiring.com/members/100234/hold
+    - row "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:18 | SID 568402BF":
+      - cell "OPR TELLER1 | BR MAIN-001 | 08/27/2026 09:51:18 | SID 568402BF"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+URL after submit: https://web-sample.interface-hiring.com/members/100234/hold/review
+
+--- visible body text after submit ---
+MERIDIAN CORE   Member Services Platform   v4.2.1
+Cornerstone Financial Systems™
+
+Main Menu  ·  Member Inquiry  ·  System Settings  ·  Sign Off
+
+SUPERVISOR OVERRIDE REQUIRED
+
+Operator profile teller1 is not authorized to perform this function. A supervisor must sign on to complete this request.
+
+Return to previous screen
+
+OPR TELLER1  |  BR MAIN-001  |  08/27/2026 09:51:18  |  SID 568402BF
+F3=Sign Off   F5=Main Menu   F7=Member Inquiry   F12=Cancel
+
+====================================================================================================
+B. AS SUPER1 (supervisor)
+====================================================================================================
+
+--- aria_snapshot: main menu after sign-on as super1 ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - row "MAIN MENU Signed on as S. VISOR (SUPERVISOR) 1. Member Inquiry / Selection 2. Funds Transfer 3. Open New Share 4. Update Member Information 5. Place Account Hold 8. System Settings (error injection) 9. Sign Off Type or click a menu option to continue.":
+      - cell "MAIN MENU Signed on as S. VISOR (SUPERVISOR) 1. Member Inquiry / Selection 2. Funds Transfer 3. Open New Share 4. Update Member Information 5. Place Account Hold 8. System Settings (error injection) 9. Sign Off Type or click a menu option to continue.":
+        - heading "MAIN MENU" [level=1]
+        - text: Signed on as S. VISOR (SUPERVISOR)
+        - table:
+          - rowgroup:
+            - row "1. Member Inquiry / Selection":
+              - cell "1."
+              - cell "Member Inquiry / Selection":
+                - link "Member Inquiry / Selection":
+                  - /url: /members
+            - row "2. Funds Transfer":
+              - cell "2."
+              - cell "Funds Transfer":
+                - link "Funds Transfer":
+                  - /url: /members?next=transfer
+            - row "3. Open New Share":
+              - cell "3."
+              - cell "Open New Share":
+                - link "Open New Share":
+                  - /url: /members?next=open-share
+            - row "4. Update Member Information":
+              - cell "4."
+              - cell "Update Member Information":
+                - link "Update Member Information":
+                  - /url: /members?next=update
+            - row "5. Place Account Hold":
+              - cell "5."
+              - cell "Place Account Hold":
+                - link "Place Account Hold":
+                  - /url: /members?next=hold
+            - row "8. System Settings (error injection)":
+              - cell "8."
+              - cell "System Settings (error injection)":
+                - link "System Settings (error injection)":
+                  - /url: /settings
+            - row "9. Sign Off":
+              - cell "9."
+              - cell "Sign Off":
+                - link "Sign Off":
+                  - /url: /signoff
+        - text: Type or click a menu option to continue.
+    - row "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:21 | SID 05C5B54C":
+      - cell "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:21 | SID 05C5B54C"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+
+====================================================================================================
+PLACE ACCOUNT HOLD -- as currently signed-on operator (super1)
+====================================================================================================
+
+--- aria_snapshot: after clicking Place Account Hold (member selection?) ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "MEMBER INQUIRY / SELECTION Search by: Member Number Value: Search Try member numbers 100234, 100987, 101555, 102777, 103001."':
+      - 'cell "MEMBER INQUIRY / SELECTION Search by: Member Number Value: Search Try member numbers 100234, 100987, 101555, 102777, 103001."':
+        - heading "MEMBER INQUIRY / SELECTION" [level=1]
+        - table:
+          - rowgroup:
+            - 'row "Search by: Member Number"':
+              - cell "Search by:"
+              - cell "Member Number":
+                - combobox:
+                  - option "Member Number" [selected]
+                  - option "Last Name"
+            - 'row "Value: Search"':
+              - cell "Value:"
+              - cell "Search":
+                - textbox
+                - button "Search"
+        - text: Try member numbers 100234, 100987, 101555, 102777, 103001.
+    - row "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:21 | SID 05C5B54C":
+      - cell "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:21 | SID 05C5B54C"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+URL after click: https://web-sample.interface-hiring.com/members?next=hold
+
+--- aria_snapshot: member search results ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "MEMBER INQUIRY / SELECTION Search by: Member Number Value: 100234 Search Member No. Name Shares 100234 Lovelace, Ada 28 Select Try member numbers 100234, 100987, 101555, 102777, 103001."':
+      - 'cell "MEMBER INQUIRY / SELECTION Search by: Member Number Value: 100234 Search Member No. Name Shares 100234 Lovelace, Ada 28 Select Try member numbers 100234, 100987, 101555, 102777, 103001."':
+        - heading "MEMBER INQUIRY / SELECTION" [level=1]
+        - table:
+          - rowgroup:
+            - 'row "Search by: Member Number"':
+              - cell "Search by:"
+              - cell "Member Number":
+                - combobox:
+                  - option "Member Number" [selected]
+                  - option "Last Name"
+            - 'row "Value: 100234 Search"':
+              - cell "Value:"
+              - cell "100234 Search":
+                - textbox: "100234"
+                - button "Search"
+        - table:
+          - rowgroup:
+            - row "Member No. Name Shares":
+              - cell "Member No."
+              - cell "Name"
+              - cell "Shares"
+              - cell
+            - row "100234 Lovelace, Ada 28 Select":
+              - cell "100234"
+              - cell "Lovelace, Ada"
+              - cell "28"
+              - cell "Select":
+                - link "Select":
+                  - /url: /members/100234/hold
+        - text: Try member numbers 100234, 100987, 101555, 102777, 103001.
+    - row "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:22 | SID 05C5B54C":
+      - cell "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:22 | SID 05C5B54C"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+
+--- aria_snapshot: after selecting member ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "PLACE ACCOUNT HOLD RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED * Share: 100234-S0001 - Regular Shares * Reason Code: FRAUD - Suspected fraud Notes: Continue Cancel"':
+      - 'cell "PLACE ACCOUNT HOLD RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED * Share: 100234-S0001 - Regular Shares * Reason Code: FRAUD - Suspected fraud Notes: Continue Cancel"':
+        - heading "PLACE ACCOUNT HOLD" [level=1]
+        - text: RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED
+        - table:
+          - rowgroup:
+            - 'row "* Share: 100234-S0001 - Regular Shares"':
+              - cell "* Share:"
+              - cell "100234-S0001 - Regular Shares":
+                - combobox:
+                  - option "100234-S0001 - Regular Shares" [selected]
+                  - option "100234-S0070 - Share Draft (Checking)"
+                  - option "100234-S0001-3 - Regular Shares"
+                  - option "100234-MMKT-4 - Money Market"
+                  - option "100234-MMKT-5 - Money Market"
+                  - option "100234-S0001-6 - Regular Shares"
+                  - option "100234-S0001-7 - Regular Shares"
+                  - option "100234-S0001-8 - Regular Shares"
+                  - option "100234-S0001-9 - Regular Shares"
+                  - option "100234-MMKT-10 - Money Market"
+                  - option "100234-S0001-11 - Regular Shares"
+                  - option "100234-S0001-12 - Regular Shares"
+                  - option "100234-MMKT-13 - Money Market"
+                  - option "100234-MMKT-14 - Money Market"
+                  - option "100234-MMKT-15 - Money Market"
+                  - option "100234-S0001-16 - Regular Shares"
+                  - option "100234-S0001-17 - Regular Shares"
+                  - option "100234-S0001-18 - Regular Shares"
+                  - option "100234-S0001-19 - Regular Shares"
+                  - option "100234-S0001-20 - Regular Shares"
+                  - option "100234-S0001-21 - Regular Shares"
+                  - option "100234-S0001-22 - Regular Shares"
+                  - option "100234-S0001-23 - Regular Shares"
+                  - option "100234-S0070-24 - Share Draft (Checking)"
+                  - option "100234-S0070-25 - Share Draft (Checking)"
+                  - option "100234-CERT-26 - Certificate"
+                  - option "100234-CERT-27 - Certificate"
+                  - option "100234-MMKT-28 - Money Market"
+            - 'row "* Reason Code: FRAUD - Suspected fraud"':
+              - cell "* Reason Code:"
+              - cell "FRAUD - Suspected fraud":
+                - combobox:
+                  - option "FRAUD - Suspected fraud" [selected]
+                  - option "LEGAL - Legal / levy"
+                  - option "DECEASED - Member deceased"
+            - row "Notes:":
+              - cell "Notes:"
+              - cell:
+                - textbox
+            - row "Continue Cancel":
+              - cell
+              - cell "Continue Cancel":
+                - button "Continue"
+                - link "Cancel":
+                  - /url: /members/100234
+    - row "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:23 | SID 05C5B54C":
+      - cell "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:23 | SID 05C5B54C"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+URL after member select: https://web-sample.interface-hiring.com/members/100234/hold
+
+comboboxes found on this screen: 2
+  combobox[0] currently selected: '100234-S0001 - Regular Shares'
+  combobox[1] currently selected: 'FRAUD - Suspected fraud'
+textboxes found: 1
+
+--- aria_snapshot: hold form filled ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "PLACE ACCOUNT HOLD RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED * Share: 100234-S0070 - Share Draft (Checking) * Reason Code: LEGAL - Legal / levy Notes: recon script -- place hold exploration Continue Cancel"':
+      - 'cell "PLACE ACCOUNT HOLD RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED * Share: 100234-S0070 - Share Draft (Checking) * Reason Code: LEGAL - Legal / levy Notes: recon script -- place hold exploration Continue Cancel"':
+        - heading "PLACE ACCOUNT HOLD" [level=1]
+        - text: RESTRICTED FUNCTION - SUPERVISOR OVERRIDE REQUIRED
+        - table:
+          - rowgroup:
+            - 'row "* Share: 100234-S0070 - Share Draft (Checking)"':
+              - cell "* Share:"
+              - cell "100234-S0070 - Share Draft (Checking)":
+                - combobox:
+                  - option "100234-S0001 - Regular Shares"
+                  - option "100234-S0070 - Share Draft (Checking)" [selected]
+                  - option "100234-S0001-3 - Regular Shares"
+                  - option "100234-MMKT-4 - Money Market"
+                  - option "100234-MMKT-5 - Money Market"
+                  - option "100234-S0001-6 - Regular Shares"
+                  - option "100234-S0001-7 - Regular Shares"
+                  - option "100234-S0001-8 - Regular Shares"
+                  - option "100234-S0001-9 - Regular Shares"
+                  - option "100234-MMKT-10 - Money Market"
+                  - option "100234-S0001-11 - Regular Shares"
+                  - option "100234-S0001-12 - Regular Shares"
+                  - option "100234-MMKT-13 - Money Market"
+                  - option "100234-MMKT-14 - Money Market"
+                  - option "100234-MMKT-15 - Money Market"
+                  - option "100234-S0001-16 - Regular Shares"
+                  - option "100234-S0001-17 - Regular Shares"
+                  - option "100234-S0001-18 - Regular Shares"
+                  - option "100234-S0001-19 - Regular Shares"
+                  - option "100234-S0001-20 - Regular Shares"
+                  - option "100234-S0001-21 - Regular Shares"
+                  - option "100234-S0001-22 - Regular Shares"
+                  - option "100234-S0001-23 - Regular Shares"
+                  - option "100234-S0070-24 - Share Draft (Checking)"
+                  - option "100234-S0070-25 - Share Draft (Checking)"
+                  - option "100234-CERT-26 - Certificate"
+                  - option "100234-CERT-27 - Certificate"
+                  - option "100234-MMKT-28 - Money Market"
+            - 'row "* Reason Code: LEGAL - Legal / levy"':
+              - cell "* Reason Code:"
+              - cell "LEGAL - Legal / levy":
+                - combobox:
+                  - option "FRAUD - Suspected fraud"
+                  - option "LEGAL - Legal / levy" [selected]
+                  - option "DECEASED - Member deceased"
+            - 'row "Notes: recon script -- place hold exploration"':
+              - cell "Notes:"
+              - cell "recon script -- place hold exploration":
+                - textbox: recon script -- place hold exploration
+            - row "Continue Cancel":
+              - cell
+              - cell "Continue Cancel":
+                - button "Continue"
+                - link "Cancel":
+                  - /url: /members/100234
+    - row "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:23 | SID 05C5B54C":
+      - cell "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:23 | SID 05C5B54C"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+
+--- aria_snapshot: after submitting hold form (review or result) ---
+- table:
+  - rowgroup:
+    - row "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™":
+      - cell "MERIDIAN CORE Member Services Platform v4.2.1 Cornerstone Financial Systems™"
+    - row "Main Menu · Member Inquiry · System Settings · Sign Off":
+      - cell "Main Menu · Member Inquiry · System Settings · Sign Off":
+        - link "Main Menu":
+          - /url: /menu
+        - text: ·
+        - link "Member Inquiry":
+          - /url: /members
+        - text: ·
+        - link "System Settings":
+          - /url: /settings
+        - text: ·
+        - link "Sign Off":
+          - /url: /signoff
+    - 'row "CONFIRM ACCOUNT HOLD IRREVERSIBLE ACTION Member: 100234 - Lovelace, Ada Share: 100234-S0070 - Share Draft (Checking) Reason: LEGAL Notes: recon script -- place hold exploration Apply Hold Cancel"':
+      - 'cell "CONFIRM ACCOUNT HOLD IRREVERSIBLE ACTION Member: 100234 - Lovelace, Ada Share: 100234-S0070 - Share Draft (Checking) Reason: LEGAL Notes: recon script -- place hold exploration Apply Hold Cancel"':
+        - heading "CONFIRM ACCOUNT HOLD" [level=1]
+        - text: IRREVERSIBLE ACTION
+        - table:
+          - rowgroup:
+            - 'row "Member: 100234 - Lovelace, Ada"':
+              - cell "Member:"
+              - cell "100234 - Lovelace, Ada"
+            - 'row "Share: 100234-S0070 - Share Draft (Checking)"':
+              - cell "Share:"
+              - cell "100234-S0070 - Share Draft (Checking)"
+            - 'row "Reason: LEGAL"':
+              - cell "Reason:"
+              - cell "LEGAL"
+            - 'row "Notes: recon script -- place hold exploration"':
+              - cell "Notes:"
+              - cell "recon script -- place hold exploration"
+        - button "Apply Hold"
+        - link "Cancel":
+          - /url: /members/100234
+    - row "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:24 | SID 05C5B54C":
+      - cell "OPR SUPER1 | BR MAIN-001 | 08/27/2026 09:51:24 | SID 05C5B54C"
+    - row "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel":
+      - cell "F3=Sign Off F5=Main Menu F7=Member Inquiry F12=Cancel"
+URL after submit: https://web-sample.interface-hiring.com/members/100234/hold/review
+
+--- visible body text after submit ---
+MERIDIAN CORE   Member Services Platform   v4.2.1
+Cornerstone Financial Systems™
+
+Main Menu  ·  Member Inquiry  ·  System Settings  ·  Sign Off
+
+CONFIRM ACCOUNT HOLD
+
+
+IRREVERSIBLE ACTION
+
+
+Member:	100234 - Lovelace, Ada
+Share:	100234-S0070 - Share Draft (Checking)
+Reason:	LEGAL
+Notes:	recon script -- place hold exploration
+
+
+  Cancel
+
+OPR SUPER1  |  BR MAIN-001  |  08/27/2026 09:51:24  |  SID 05C5B54C
+F3=Sign Off   F5=Main Menu   F7=Member Inquiry   F12=Cancel
+
+====================================================================================================
+DONE -- closing browser
+====================================================================================================

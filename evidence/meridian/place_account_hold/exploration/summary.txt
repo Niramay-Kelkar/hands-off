@@ -1,0 +1,49 @@
+Exploration for CLAUDE.md task 2(a) -- real, non-mocked run of
+scripts/recon_place_hold.py against MERIDIAN CORE. Full transcript:
+recon_output.txt. Screenshots: recon_hold_{teller1,super1}_filled.png
+(hold form filled before submit) and
+recon_hold_{teller1,super1}_after_submit.png (result after submit).
+
+Question asked: does the app show an in-context supervisor-override
+prompt (a supervisor authorizes right there without leaving the flow),
+or a hard rejection requiring a completely separate supervisor sign-on?
+
+Finding: a HARD REJECTION requiring a completely separate supervisor
+sign-on. Specifically:
+
+1. The Place Account Hold FORM itself is visible to a non-supervisor
+   (teller1) and can be filled out -- it even shows a static warning
+   banner in its own heading area ("RESTRICTED FUNCTION - SUPERVISOR
+   OVERRIDE REQUIRED"), but this is just text, not an interactive
+   override control (no inline "authorize as supervisor" button/field
+   anywhere on that screen).
+
+2. Clicking Continue (submitting the form) is where the real
+   enforcement happens: teller1 is redirected to
+   /members/100234/hold/review, which renders NOT the expected
+   "CONFIRM ACCOUNT HOLD" review screen but a distinct rejection page:
+
+     SUPERVISOR OVERRIDE REQUIRED
+     Operator profile teller1 is not authorized to perform this
+     function. A supervisor must sign on to complete this request.
+     Return to previous screen
+
+   HTTP 403. There is no button, link, or form field on this page that
+   lets a supervisor authorize in place -- the only affordance is
+   "Return to previous screen". The only way forward is: sign off the
+   non-supervisor operator, sign on as an actual supervisor operator
+   (super1), and redo the request.
+
+3. As super1, the SAME Continue click instead reaches the real
+   CONFIRM ACCOUNT HOLD review screen (heading "IRREVERSIBLE ACTION"),
+   with an "Apply Hold" button that posts the hold for real.
+
+This directly determined the escalation design used for
+meridian_place_account_hold.compiled.json: the permission gap is
+handled as an ESCALATION (step_overrides on step 12, the Continue
+click: retry 0, then escalate on every trigger), not as a declared
+expected_outcome/business outcome -- per the standing design decision
+that a resolvable in-session privilege gap escalates rather than being
+reported. See escalation/note.txt for how a real resume from this
+paused state works, and CLAUDE.md's task log / BUILD_LOG.md for the
+end-to-end verification.

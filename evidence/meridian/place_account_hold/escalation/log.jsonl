@@ -1,0 +1,49 @@
+{"ts": "2026-08-27T10:13:41.547547+00:00", "kind": "run_start", "capability_id": "meridian_place_account_hold", "version": 1, "params": {"operator_id": "teller1", "password": "[REDACTED]", "branch": "MAIN-001 - Main Office", "member_id": "100234", "share": "[REDACTED]", "reason_code": "LEGAL - Legal / levy", "notes": "replay escalation test"}}
+{"ts": "2026-08-27T10:13:45.582481+00:00", "kind": "risk_gate_pause", "risk_class": "mutating", "requires_confirmation": true, "screenshot": "evidence/runs/meridian_place_account_hold_20260827T101341Z_75b8a2/screenshots/step_0_risk_confirmation_required.png"}
+{"ts": "2026-08-27T10:13:46.703348+00:00", "kind": "risk_gate_resumed"}
+{"ts": "2026-08-27T10:13:46.801674+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:46.873535+00:00", "kind": "action", "type": "select", "value": "MAIN-001 - Main Office"}
+{"ts": "2026-08-27T10:13:47.932431+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:48.057120+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:48.134423+00:00", "kind": "action", "type": "type", "value": "teller1"}
+{"ts": "2026-08-27T10:13:49.195084+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:49.255983+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:49.312585+00:00", "kind": "action", "type": "type", "value": "password"}
+{"ts": "2026-08-27T10:13:50.380263+00:00", "kind": "checkpoint", "step_id": 3, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:50.440984+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:50.679583+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:51.770310+00:00", "kind": "checkpoint", "step_id": 4, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:51.829477+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:52.077638+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:53.131758+00:00", "kind": "checkpoint", "step_id": 5, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:53.195515+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:53.249349+00:00", "kind": "action", "type": "type", "value": "100234"}
+{"ts": "2026-08-27T10:13:54.304583+00:00", "kind": "checkpoint", "step_id": 6, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:54.350631+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:54.615846+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:55.712311+00:00", "kind": "checkpoint", "step_id": 7, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:55.785959+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:56.108065+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:13:57.258497+00:00", "kind": "checkpoint", "step_id": 8, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:57.390268+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:57.513039+00:00", "kind": "action", "type": "select", "value": "100234-CERT-27 - Certificate"}
+{"ts": "2026-08-27T10:13:58.635911+00:00", "kind": "checkpoint", "step_id": 9, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:13:58.756984+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:13:58.890424+00:00", "kind": "action", "type": "select", "value": "LEGAL - Legal / levy"}
+{"ts": "2026-08-27T10:14:00.028945+00:00", "kind": "checkpoint", "step_id": 10, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:14:00.159212+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:14:00.288919+00:00", "kind": "action", "type": "type", "value": "replay escalation test"}
+{"ts": "2026-08-27T10:14:01.415809+00:00", "kind": "checkpoint", "step_id": 11, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:14:01.526436+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:14:01.716384+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:14:04.744757+00:00", "kind": "checkpoint", "step_id": 12, "matched": false, "outcome_code": null, "detail": "no visible role='button' matching {'name': 'Apply Hold'}; none of ['INVALID_CREDENTIALS', 'VALIDATION_ERROR'] matched"}
+{"ts": "2026-08-27T10:14:04.860359+00:00", "kind": "escalate", "step_id": 12, "trigger": "on_checkpoint_failure", "detail": "no visible role='button' matching {'name': 'Apply Hold'}; none of ['INVALID_CREDENTIALS', 'VALIDATION_ERROR'] matched", "screenshot": "evidence/runs/meridian_place_account_hold_20260827T101341Z_75b8a2/screenshots/step_12_on_checkpoint_failure.png"}
+{"ts": "2026-08-27T10:14:11.963077+00:00", "kind": "escalation_resumed", "step_id": 12}
+{"ts": "2026-08-27T10:14:13.050536+00:00", "kind": "checkpoint", "step_id": 12, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:14:13.106230+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:14:13.335006+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T10:14:14.401890+00:00", "kind": "checkpoint", "step_id": 13, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:14:14.454813+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T10:14:14.508993+00:00", "kind": "action", "type": "extract", "output": "hold_confirmation", "strategy_kind": "accessibility"}
+{"ts": "2026-08-27T10:14:15.568612+00:00", "kind": "checkpoint", "step_id": 14, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T10:14:15.617510+00:00", "kind": "run_end", "status": "success"}
