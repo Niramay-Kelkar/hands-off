@@ -3,7 +3,7 @@
   "capability_id": "meridian_member_balance_inquiry",
   "version": 1,
   "description": "Sign on to MERIDIAN CORE, search for a member by member number, and read their name and share balance.",
-  "created_at": "2026-08-27T06:36:46.175851Z",
+  "created_at": "2026-08-27T15:54:46.133995Z",
   "created_by": "agent.compile",
   "source_run_id": "discover_20260827T063341Z_d148b6",
   "target": {
@@ -441,12 +441,7 @@
                   "kind": "accessibility",
                   "priority": 1,
                   "role": "cell",
-                  "name": "$1,500.00"
-                },
-                {
-                  "kind": "text_label",
-                  "priority": 2,
-                  "label": "$1,500.00"
+                  "name_matches": "^\\$[\\d,]+\\.\\d{2}$"
                 }
               ]
             }

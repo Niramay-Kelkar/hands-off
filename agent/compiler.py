@@ -269,6 +269,27 @@ def _build_action_step(step_id: int, action: TrajectoryStep, checkpoint: Conditi
     return Step(step_id=step_id, description=description, action=action_model, locator=locator, checkpoint=checkpoint)
 
 
+def _money_locator_for() -> LocatorSpec:
+    # label_for_value's label-cell/sibling-value convention only covers a
+    # 2-column label:value row (e.g. "Name:" / "Lovelace, Ada") -- it finds
+    # nothing for a value sitting in a column-header table (e.g. a shares
+    # table with "Share ID | Type | Balance | Status" headers, no per-cell
+    # "Balance:" label), so extract_label comes back None there even though
+    # the value is real. Falling through to a literal-value locator in that
+    # case (the old behavior) pins replay to the exact dollar figure seen at
+    # discovery/compile time, which breaks the moment the live balance
+    # changes -- discovered as a real bug in meridian_member_balance_inquiry,
+    # see BUILD_LOG.md. A money-shaped value gets a money-pattern locator
+    # instead: still untied to the literal figure, and .first (in
+    # resolve_locator) reproduces "whichever cell discovery actually read"
+    # since it's the first such cell in DOM order, same as discovery saw.
+    return LocatorSpec(
+        strategies=[
+            LocatorStrategyModel(kind="accessibility", priority=1, role="cell", name_matches=r"^\$[\d,]+\.\d{2}$"),
+        ]
+    )
+
+
 def _build_extract_step(
     step_id: int, extract_actions: list[TrajectoryStep], output_names: list[str], params: dict[str, str]
 ) -> Step:
@@ -277,6 +298,8 @@ def _build_extract_step(
         inp = a.tool_call["input"]
         if a.extract_label:
             locator = _label_locator_for(a.extract_label)
+        elif _MONEY_PATTERN.match(inp["name"]):
+            locator = _money_locator_for()
         else:
             role = inp["role"]
             target_name = templatize(inp["name"], params)
