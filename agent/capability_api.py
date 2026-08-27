@@ -100,8 +100,10 @@ def invoke_capability(capability_id: str):
     if not isinstance(params, dict):
         return jsonify({"error": "request body must be a JSON object of param name/value pairs"}), 400
 
+    inject = request.args.get("inject")
+
     try:
-        result = run_capability(capability, params, headed=_headed_default())
+        result = run_capability(capability, params, headed=_headed_default(), inject=inject)
     except InputValidationError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # safety net — run_capability already turns most failures into HardFailureResult
