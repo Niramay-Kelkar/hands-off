@@ -34,6 +34,17 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="glob route pattern to allow (repeatable); defaults to '/*' on the target's origin",
     )
+    parser.add_argument(
+        "--redact-fields",
+        action="append",
+        dest="redact_fields",
+        default=None,
+        help=(
+            "extra label/header text to redact (repeatable), e.g. --redact-fields 'E-mail' "
+            "--redact-fields 'Share ID'; merged with the built-in baseline "
+            "(password/ssn/account_number/token/secret), which always applies regardless"
+        ),
+    )
     args = parser.parse_args(argv)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -47,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         model=args.model,
         headed=not args.headless,
         allowlist_routes=args.allowlist_routes,
+        redact_fields=args.redact_fields,
         out_path=args.out,
     )
 

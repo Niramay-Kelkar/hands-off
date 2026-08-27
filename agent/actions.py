@@ -1,9 +1,10 @@
 """ACTION_REGISTRY: one function per step action type.
 
-`type` and `click` act on the step-level ResolvedLocator the engine
-already resolved. `navigate` ignores it and calls page.goto(). `extract`
-ignores it too (its step has no top-level `locator` — each output field
-carries its own strategy list) and resolves each field's locator itself.
+`type`, `click`, and `select` act on the step-level ResolvedLocator the
+engine already resolved. `navigate` ignores it and calls page.goto().
+`extract` ignores it too (its step has no top-level `locator` — each
+output field carries its own strategy list) and resolves each field's
+locator itself.
 """
 
 from __future__ import annotations
@@ -37,6 +38,15 @@ def _click(action: ActionModel, resolved: ResolvedLocator | None, ctx: "RunConte
         raise ValueError("click action requires a step-level locator")
     resolved.locator.click()
     ctx.log.event("action", type="click")
+
+
+@ACTION_REGISTRY.register("select")
+def _select(action: ActionModel, resolved: ResolvedLocator | None, ctx: "RunContext") -> None:
+    if resolved is None:
+        raise ValueError("select action requires a step-level locator")
+    value = substitute(action.value or "", ctx.params)
+    resolved.locator.select_option(label=value)
+    ctx.log.event("action", type="select", value=value)
 
 
 @ACTION_REGISTRY.register("navigate")

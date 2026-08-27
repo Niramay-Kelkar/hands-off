@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import anthropic
 from playwright.sync_api import sync_playwright
@@ -25,7 +26,7 @@ from agent.trajectory import Trajectory, TrajectoryStep, TrajectoryTarget
 DEFAULT_MAX_STEPS = 25
 DEFAULT_MODEL = "claude-sonnet-5"
 DEFAULT_ALLOWLIST_ROUTES = ["/*"]
-ALLOWED_ACTION_TYPES = ["click", "type", "navigate", "extract"]
+ALLOWED_ACTION_TYPES = ["click", "type", "select", "navigate", "extract"]
 DEFAULT_REDACT_FIELDS = ["password", "ssn", "account_number", "token", "secret"]
 
 SYSTEM_PROMPT = """You are a discovery agent. You are shown a goal and, each turn, a text \
@@ -33,8 +34,9 @@ description of the current page's accessibility tree: the role and accessible na
 every element, with enough structure to tell elements apart. There is no screenshot; \
 reason only from this text.
 
-You must call exactly one tool every turn. Available actions: click, type, navigate, \
-extract. Use extract to record any value the goal asks you to read, with a clear \
+You must call exactly one tool every turn. Available actions: click, type, select, \
+navigate, extract. Use select for a dropdown/combobox, giving the visible option text \
+as value. Use extract to record any value the goal asks you to read, with a clear \
 output_name — extract independently re-reads the value from the live page, so it will \
 fail if your role/name don't uniquely identify one element. When the goal has been \
 fully achieved, call done with the output_names of everything you extracted (not the \
@@ -54,14 +56,21 @@ def run_discovery(
     model: str = DEFAULT_MODEL,
     headed: bool = True,
     allowlist_routes: list[str] | None = None,
+    redact_fields: list[str] | None = None,
     out_path: str | Path | None = None,
 ) -> Trajectory:
     allowed_origin = guardrails.derive_origin(target_url)
     allowlist_routes = allowlist_routes or list(DEFAULT_ALLOWLIST_ROUTES)
+    # Union, never replace: DEFAULT_REDACT_FIELDS is the baseline every
+    # discovery run must always mask regardless of what a target-specific
+    # policy adds on top (e.g. MERIDIAN's "E-mail"/"Phone"/"Address"/
+    # "Share ID", which password/ssn/account_number/token/secret alone
+    # don't cover).
+    redact_fields = list(dict.fromkeys(DEFAULT_REDACT_FIELDS + list(redact_fields or [])))
 
     run_id = evidence.new_run_id("discover")
     rdir = evidence.run_dir(run_id)
-    log = StepLogWriter(rdir / "log.jsonl", DEFAULT_REDACT_FIELDS)
+    log = StepLogWriter(rdir / "log.jsonl", redact_fields)
     log.event("run_start", goal=goal, target=target_url, model=model)
 
     client = anthropic.Anthropic()
@@ -101,7 +110,7 @@ def run_discovery(
                 trajectory.save(out_path)
             return trajectory
 
-        observation = perception.observe(page, redact_fields=DEFAULT_REDACT_FIELDS)
+        observation = perception.observe(page, redact_fields=redact_fields)
         log.event("observation", step_index=0, observation=observation)
 
         messages: list[dict] = [{"role": "user", "content": f"Goal: {goal}\n\nCurrent page:\n{observation}"}]
@@ -121,7 +130,7 @@ def run_discovery(
                 tool_use = next((b for b in response.content if b.type == "tool_use"), None)
                 model_text = "\n".join(b.text for b in response.content if b.type == "text")
 
-                sensitive = redaction.find_sensitive_fields(page, DEFAULT_REDACT_FIELDS)
+                sensitive = redaction.find_sensitive_fields(page, redact_fields)
                 model_text = redaction.mask_text(model_text, sensitive)
                 screenshot_path = evidence.save_screenshot(
                     page, rdir, step_index, "step", mask_locators=[f.locator for f in sensitive]
@@ -134,9 +143,20 @@ def run_discovery(
                     trajectory.final_summary = "model turn produced no tool call"
                     break
 
-                log.event("tool_call", step_index=step_index, name=tool_use.name, input=tool_use.input)
+                # Masked with the same `sensitive` list used for model_text/screenshots
+                # above, and applied here (once, before either persistence path) rather
+                # than relying on StepLogWriter's own value-redaction pass in
+                # agent/evidence.py -- that pass keys its lookup by field_name, so when
+                # several distinct values share one name (e.g. 27 different "Share ID"
+                # rows), only the last one survives and everything else logs raw. A
+                # field like `done`'s free-text summary is the one place the model can
+                # echo back page content it just read, the same risk model_text already
+                # covers -- click/navigate results are otherwise fixed template strings.
+                masked_input = _mask_tool_input(tool_use.input, sensitive)
+                log.event("tool_call", step_index=step_index, name=tool_use.name, input=masked_input)
                 outcome = _dispatch(tool_use.name, tool_use.input, ctx)
-                log.event("tool_result", step_index=step_index, ok=outcome.ok, detail=outcome.detail)
+                masked_detail = redaction.mask_text(outcome.detail, sensitive)
+                log.event("tool_result", step_index=step_index, ok=outcome.ok, detail=masked_detail)
 
                 trajectory.steps.append(
                     TrajectoryStep(
@@ -144,9 +164,10 @@ def run_discovery(
                         observation=observation,
                         screenshot_path=screenshot_path,
                         model_text=model_text,
-                        tool_call={"name": tool_use.name, "input": tool_use.input},
-                        tool_result={"ok": outcome.ok, "detail": outcome.detail},
+                        tool_call={"name": tool_use.name, "input": masked_input},
+                        tool_result={"ok": outcome.ok, "detail": masked_detail},
                         extract_label=outcome.label,
+                        resolved_via=outcome.resolved_via,
                     )
                 )
                 if out_path is not None:
@@ -155,10 +176,10 @@ def run_discovery(
                 if outcome.ended:
                     trajectory.status = "done"
                     trajectory.final_outputs = outcome.outputs
-                    trajectory.final_summary = outcome.detail
+                    trajectory.final_summary = masked_detail
                     break
 
-                observation = perception.observe(page, redact_fields=DEFAULT_REDACT_FIELDS)
+                observation = perception.observe(page, redact_fields=redact_fields)
                 log.event("observation", step_index=step_index, observation=observation)
                 messages.append(
                     {
@@ -185,6 +206,20 @@ def run_discovery(
     if out_path is not None:
         trajectory.save(out_path)
     return trajectory
+
+
+def _mask_tool_input(value: Any, fields: list) -> Any:
+    """Recursively applies redaction.mask_text to every string leaf of a
+    tool call's input (e.g. `done`'s free-text summary) before it's logged
+    or persisted — see the comment at its call site for why this can't be
+    left to agent.evidence.StepLogWriter's own redaction pass alone."""
+    if isinstance(value, str):
+        return redaction.mask_text(value, fields)
+    if isinstance(value, dict):
+        return {k: _mask_tool_input(v, fields) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_mask_tool_input(v, fields) for v in value]
+    return value
 
 
 def _dispatch(name: str, tool_input: dict, ctx: DiscoveryContext) -> ToolOutcome:

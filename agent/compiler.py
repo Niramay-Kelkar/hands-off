@@ -34,7 +34,7 @@ from agent.template import templatize
 from agent.trajectory import Trajectory, TrajectoryStep
 
 SCHEMA_VERSION = "1.0"
-ACTIONABLE_TOOLS = {"click", "type", "navigate", "extract"}
+ACTIONABLE_TOOLS = {"click", "type", "select", "navigate", "extract"}
 _MONEY_PATTERN = re.compile(r"^\$[\d,]+\.\d{2}$")
 
 
@@ -152,7 +152,27 @@ def _checkpoint_for(
         if next_action.extract_label:
             element_check = ConditionSpec(type="element_visible", role="cell", name=next_action.extract_label)
         else:
-            element_check = ConditionSpec(type="element_visible", role=role, name=None)
+            # No label-cell/value-cell pair to fall back on (e.g. a standalone
+            # heading, not a labeled data field) -- nulling the name here
+            # would make this an "any element with this role is visible"
+            # check, which is trivially true on almost every page and would
+            # silently defeat the checkpoint's actual job. Unlike a data
+            # value (a member's name/balance, which varies per input and
+            # per run), a landmark like a page heading is stable and safe to
+            # check for directly, the same as any non-extract step's target.
+            name = templatize(inp["name"], params)
+            element_check = ConditionSpec(type="element_visible", role=role, name=name)
+    elif next_action.resolved_via == "label_proximity":
+        # element_visible resolves role+name via a plain accessibility lookup
+        # (agent/checkpoints.py) -- it has no label_proximity-aware fallback,
+        # and adding one there is out of scope for this compiler-side change.
+        # A hostile form's field carries no accessible name at all, so that
+        # lookup can never match. The field's label text, though, is real
+        # visible page text (it's what let label_proximity find the field by
+        # row in the first place) -- check for that instead, which needs
+        # nothing beyond the already-supported text_present checkpoint.
+        name = templatize(inp["name"], params)
+        element_check = ConditionSpec(type="text_present", value=f"{name}:", scope="page")
     else:
         name = templatize(inp["name"], params)
         element_check = ConditionSpec(type="element_visible", role=role, name=name)
@@ -177,6 +197,15 @@ def _locator_for(role: str, name: str) -> LocatorSpec:
             LocatorStrategyModel(kind="text_label", priority=2, label=name),
         ]
     )
+
+
+def _label_proximity_locator_for(name: str) -> LocatorSpec:
+    # No accessibility/text_label fallback here, same reasoning as the "no
+    # css fallback ever synthesized" rule below: discovery only verified
+    # label_proximity resolution for this field (its accessible name is
+    # blank), so accessibility/text_label would just fail identically at
+    # replay -- emitting them would misrepresent what was actually proven.
+    return LocatorSpec(strategies=[LocatorStrategyModel(kind="label_proximity", priority=1, label=name)])
 
 
 def _label_locator_for(label: str) -> LocatorSpec:
@@ -210,12 +239,20 @@ def _build_action_step(step_id: int, action: TrajectoryStep, checkpoint: Conditi
 
     role = inp["role"]
     target_name = templatize(inp["name"], params)
-    locator = _locator_for(role, target_name)
+    locator = (
+        _label_proximity_locator_for(target_name)
+        if action.resolved_via == "label_proximity"
+        else _locator_for(role, target_name)
+    )
 
     if name == "type":
         value = templatize(inp["value"], params)
         action_model = ActionModel(type="type", value=value)
         description = f"Type into role={role!r} name={target_name!r}"
+    elif name == "select":
+        value = templatize(inp["value"], params)
+        action_model = ActionModel(type="select", value=value)
+        description = f"Select {value!r} in role={role!r} name={target_name!r}"
     else:  # click
         action_model = ActionModel(type="click")
         description = f"Click role={role!r} name={target_name!r}"

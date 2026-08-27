@@ -1,5 +1,5 @@
 """Discovery tool vocabulary: matches agent.actions.ACTION_REGISTRY
-(click/type/navigate/extract) plus `done`, which the replay engine
+(click/type/select/navigate/extract) plus `done`, which the replay engine
 doesn't need.
 
 Every tool call resolves to a ToolOutcome with a populated `detail` —
@@ -12,6 +12,7 @@ caller in agent.discovery and turned into the same ToolOutcome shape.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -55,6 +56,28 @@ TOOL_SCHEMAS: list[dict] = [
                 "value": {
                     "type": "string",
                     "description": "The literal text to type — the real value from the goal, not a placeholder.",
+                },
+            },
+            "required": ["role", "name", "value"],
+        },
+    },
+    {
+        "name": "select",
+        "description": (
+            "Select an option from a dropdown/combobox by its visible option text, identified by the "
+            "combobox's accessibility role and accessible name."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "role": {"type": "string", "description": "ARIA role of the target field, typically 'combobox'."},
+                "name": {
+                    "type": "string",
+                    "description": "Accessible name of the target field, exactly as shown in the observation.",
+                },
+                "value": {
+                    "type": "string",
+                    "description": "The visible option text to select, exactly as shown in the observation.",
                 },
             },
             "required": ["role", "name", "value"],
@@ -130,15 +153,20 @@ class ToolOutcome:
     ended: bool = False
     outputs: dict[str, str] | None = None
     label: str | None = None
+    resolved_via: str | None = None
 
 
 DiscoveryToolFn = Callable[[dict[str, Any], DiscoveryContext], ToolOutcome]
 DISCOVERY_TOOL_REGISTRY: Registry[DiscoveryToolFn] = Registry("discovery_tool")
 
 
-def _resolve_unique(page, role: str, name: str) -> tuple[Locator | None, str | None]:
+def _resolve_unique(page, role: str, name: str) -> tuple[Locator | None, str | None, str | None]:
     """0 matches or >1 matches comes back as a clean, actionable message —
-    never an uncaught exception that crashes the run."""
+    never an uncaught exception that crashes the run. Third element of the
+    return tuple names which resolution path succeeded ("accessibility" or
+    "label_proximity") — recorded on the trajectory step so the compiler
+    knows which locator strategy to emit for replay (see
+    agent.compiler._build_action_step); None on failure."""
     # exact=True: this app's nested-table cells compute compound accessible
     # names by concatenating descendant text, so a leaf cell's exact name
     # (e.g. "Jane Doe") is always a substring of its ancestor wrapper
@@ -149,14 +177,46 @@ def _resolve_unique(page, role: str, name: str) -> tuple[Locator | None, str | N
     try:
         locator.first.wait_for(state="attached", timeout=3000)
     except PWTimeoutError:
-        return None, f"no element found with role={role!r} name={name!r}; re-check the current observation and try again"
+        return _resolve_by_label_row(page, role, name)
     count = locator.count()
     if count > 1:
         return None, (
             f"{count} elements matched role={role!r} name={name!r}; "
             "make the name more specific so it uniquely identifies one element"
-        )
-    return locator.first, None
+        ), None
+    return locator.first, None, "accessibility"
+
+
+def _resolve_by_label_row(page, role: str, name: str) -> tuple[Locator | None, str | None, str | None]:
+    """Fallback for a hostile form whose inputs carry no accessible name at
+    all (label and input live in separate table cells with no for=/
+    aria-label association, so the exact accessible-name lookup above
+    always finds 0 matches) — the model's only way to identify such a
+    field is by the label text it can actually see in the observation, so
+    resolve it the same way replay's label_proximity locator strategy does
+    (agent/locators.py): the <tr> whose accessible name starts with
+    "<name>:", then the first element of the requested role within that
+    row. The anchor rules out an ancestor wrapping row whose name happens
+    to also CONTAIN this label somewhere in its concatenation of every
+    field on the form — that ancestor's name never STARTS WITH this one
+    field's label — while still matching a row whose own name carries the
+    field's current dynamic value after the label (e.g. a <select> row
+    rendered as "Branch: MAIN-001 - Main Office")."""
+    row = page.get_by_role("row", name=re.compile(f"^{re.escape(name)}:"))
+    if row.count() == 0:
+        return None, f"no element found with role={role!r} name={name!r}; re-check the current observation and try again", None
+    candidate = row.first.get_by_role(role)
+    if candidate.count() == 0:
+        return None, (
+            f"found a row labeled {name!r} but no role={role!r} element inside it; "
+            "re-check the current observation and try a different role"
+        ), None
+    if candidate.count() > 1:
+        return None, (
+            f"{candidate.count()} role={role!r} elements found in the row labeled {name!r}; "
+            "make the name more specific so it uniquely identifies one row"
+        ), None
+    return candidate.first, None, "label_proximity"
 
 
 def _post_action_route_check(ctx: DiscoveryContext, before_url: str, success_detail: str) -> ToolOutcome:
@@ -186,22 +246,34 @@ def _post_action_route_check(ctx: DiscoveryContext, before_url: str, success_det
 @DISCOVERY_TOOL_REGISTRY.register("click")
 def _click(tool_input: dict[str, Any], ctx: DiscoveryContext) -> ToolOutcome:
     role, name = tool_input["role"], tool_input["name"]
-    locator, err = _resolve_unique(ctx.page, role, name)
+    locator, err, resolved_via = _resolve_unique(ctx.page, role, name)
     if err:
         return ToolOutcome(ok=False, detail=err)
     before_url = ctx.page.url
     locator.click()
-    return _post_action_route_check(ctx, before_url, f"clicked role={role!r} name={name!r}")
+    outcome = _post_action_route_check(ctx, before_url, f"clicked role={role!r} name={name!r}")
+    outcome.resolved_via = resolved_via
+    return outcome
 
 
 @DISCOVERY_TOOL_REGISTRY.register("type")
 def _type(tool_input: dict[str, Any], ctx: DiscoveryContext) -> ToolOutcome:
     role, name, value = tool_input["role"], tool_input["name"], tool_input["value"]
-    locator, err = _resolve_unique(ctx.page, role, name)
+    locator, err, resolved_via = _resolve_unique(ctx.page, role, name)
     if err:
         return ToolOutcome(ok=False, detail=err)
     locator.fill(value)
-    return ToolOutcome(ok=True, detail=f"typed {value!r} into role={role!r} name={name!r}")
+    return ToolOutcome(ok=True, detail=f"typed {value!r} into role={role!r} name={name!r}", resolved_via=resolved_via)
+
+
+@DISCOVERY_TOOL_REGISTRY.register("select")
+def _select(tool_input: dict[str, Any], ctx: DiscoveryContext) -> ToolOutcome:
+    role, name, value = tool_input["role"], tool_input["name"], tool_input["value"]
+    locator, err, resolved_via = _resolve_unique(ctx.page, role, name)
+    if err:
+        return ToolOutcome(ok=False, detail=err)
+    locator.select_option(label=value)
+    return ToolOutcome(ok=True, detail=f"selected {value!r} in role={role!r} name={name!r}", resolved_via=resolved_via)
 
 
 @DISCOVERY_TOOL_REGISTRY.register("navigate")
@@ -218,7 +290,7 @@ def _navigate(tool_input: dict[str, Any], ctx: DiscoveryContext) -> ToolOutcome:
 @DISCOVERY_TOOL_REGISTRY.register("extract")
 def _extract(tool_input: dict[str, Any], ctx: DiscoveryContext) -> ToolOutcome:
     role, name, output_name = tool_input["role"], tool_input["name"], tool_input["output_name"]
-    locator, err = _resolve_unique(ctx.page, role, name)
+    locator, err, _resolved_via = _resolve_unique(ctx.page, role, name)
     if err:
         return ToolOutcome(ok=False, detail=err)
     value = locator.inner_text().strip()
