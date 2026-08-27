@@ -80,13 +80,16 @@ def _label_proximity(scope: Page, strategy: LocatorStrategyModel, params: dict[s
     # sign-on panel row containing both "Operator ID:" and "Password:") --
     # `.first` on that would pick the ANCESTOR row, whose first descendant
     # input is always the first field on the form, silently returning the
-    # wrong element for every field but the first. Prefer an exact row-name
-    # match (with, then without, a trailing colon) to land on the specific
-    # single-field row; only fall back to the old substring scan for a
-    # layout where no row carries that exact accessible name.
-    row = scope.get_by_role("row", name=f"{label}:", exact=True)
-    if row.count() == 0:
-        row = scope.get_by_role("row", name=label, exact=True)
+    # wrong element for every field but the first. An anchored ^label: regex
+    # on the row's own accessible name rules that ancestor out (its name
+    # starts with the panel's heading text, never with this one field's
+    # label) while still matching a row whose name carries the field's
+    # current dynamic value after the label (e.g. a <select> row rendered
+    # as "Branch: MAIN-001 - Main Office") -- an exact-match on "label:"
+    # alone can't do that, since the row's name changes with the selection.
+    # Only fall back to the old substring scan for a layout where no row
+    # carries a "label:"-prefixed accessible name at all.
+    row = scope.get_by_role("row", name=re.compile(f"^{re.escape(label)}:"))
     if row.count() == 0:
         row = scope.locator(f"tr:has-text({label!r})")
     return row.first.locator("input, select, textarea").first
