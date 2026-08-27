@@ -1,0 +1,46 @@
+{"ts": "2026-08-27T07:26:16.525912+00:00", "kind": "run_start", "capability_id": "meridian_funds_transfer", "version": 1, "params": {"operator_id": "teller1", "password": "[REDACTED]", "branch": "MAIN-001 - Main Office", "member_id": "100234", "from_share": "100234-CERT-26 - Certificate ($499.00)", "to_share": "100234-MMKT-15 - Money Market ($5.00)", "amount": "99999.00", "memo": "overdraft replay test"}}
+{"ts": "2026-08-27T07:26:18.701808+00:00", "kind": "risk_gate_pause", "risk_class": "mutating", "requires_confirmation": true, "screenshot": "evidence/runs/meridian_funds_transfer_20260827T072616Z_7c2ef0/screenshots/step_0_risk_confirmation_required.png"}
+{"ts": "2026-08-27T07:28:34.287428+00:00", "kind": "risk_gate_resumed"}
+{"ts": "2026-08-27T07:28:34.370687+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:34.428524+00:00", "kind": "action", "type": "select", "value": "MAIN-001 - Main Office"}
+{"ts": "2026-08-27T07:28:35.490790+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:35.560159+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:35.649323+00:00", "kind": "action", "type": "type", "value": "teller1"}
+{"ts": "2026-08-27T07:28:36.702793+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:36.757261+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:36.932589+00:00", "kind": "action", "type": "type", "value": "password"}
+{"ts": "2026-08-27T07:28:37.983486+00:00", "kind": "checkpoint", "step_id": 3, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:38.038572+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:38.444051+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T07:28:39.528972+00:00", "kind": "checkpoint", "step_id": 4, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:39.586741+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:39.700488+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T07:28:40.737057+00:00", "kind": "checkpoint", "step_id": 5, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:40.795412+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:40.920872+00:00", "kind": "action", "type": "type", "value": "100234"}
+{"ts": "2026-08-27T07:28:41.995532+00:00", "kind": "checkpoint", "step_id": 6, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:42.059499+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:42.225239+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T07:28:43.320038+00:00", "kind": "checkpoint", "step_id": 7, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:43.403471+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:44.044533+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T07:28:45.534867+00:00", "kind": "checkpoint", "step_id": 8, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:46.051700+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:46.184213+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T07:28:47.241585+00:00", "kind": "checkpoint", "step_id": 9, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:47.310780+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:47.361287+00:00", "kind": "action", "type": "select", "value": "100234-CERT-26 - Certificate ($499.00)"}
+{"ts": "2026-08-27T07:28:48.431149+00:00", "kind": "checkpoint", "step_id": 10, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:48.487928+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:48.563043+00:00", "kind": "action", "type": "select", "value": "100234-MMKT-15 - Money Market ($5.00)"}
+{"ts": "2026-08-27T07:28:49.622465+00:00", "kind": "checkpoint", "step_id": 11, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:49.686506+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:49.740312+00:00", "kind": "action", "type": "type", "value": "99999.00"}
+{"ts": "2026-08-27T07:28:50.794320+00:00", "kind": "checkpoint", "step_id": 12, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:50.850560+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:50.998823+00:00", "kind": "action", "type": "type", "value": "overdraft replay test"}
+{"ts": "2026-08-27T07:28:52.053541+00:00", "kind": "checkpoint", "step_id": 13, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T07:28:52.105004+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T07:28:52.216667+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T07:28:55.249352+00:00", "kind": "checkpoint", "step_id": 14, "matched": true, "outcome_code": "INSUFFICIENT_FUNDS", "detail": null}
+{"ts": "2026-08-27T07:28:55.268547+00:00", "kind": "run_end", "status": "business_outcome"}
