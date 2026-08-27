@@ -74,5 +74,25 @@
       },
       "on_hard_failure": "escalate"
     }
+  },
+  "step_overrides": {
+    "13": {
+      "on_checkpoint_failure": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_step_timeout": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_hard_failure": {
+        "retry": 0,
+        "then": "escalate"
+      }
+    }
   }
 }

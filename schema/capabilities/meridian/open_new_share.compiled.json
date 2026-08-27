@@ -3,7 +3,7 @@
   "capability_id": "meridian_open_new_share",
   "version": 1,
   "description": "Sign on to MERIDIAN CORE, open a new share for a member with a chosen share type and initial deposit, and post it for real.",
-  "created_at": "2026-08-27T11:04:32.197665Z",
+  "created_at": "2026-08-27T17:02:02.353258Z",
   "created_by": "agent.compile",
   "source_run_id": "discover_20260827T110213Z_d2802f",
   "target": {
@@ -656,7 +656,24 @@
           }
         ]
       },
-      "escalation_override": null
+      "escalation_override": {
+        "on_checkpoint_failure": {
+          "retry": 0,
+          "then": "escalate"
+        },
+        "on_unrecognized_dialog": {
+          "retry": 0,
+          "then": "escalate"
+        },
+        "on_step_timeout": {
+          "retry": 0,
+          "then": "escalate"
+        },
+        "on_hard_failure": {
+          "retry": 0,
+          "then": "escalate"
+        }
+      }
     },
     {
       "step_id": 14,
