@@ -90,6 +90,8 @@ def compile_trajectory(
 
     steps.append(_build_extract_step(step_id, extract_actions, output_names, params))
 
+    _apply_step_overrides(steps, policy.step_overrides)
+
     outputs = [_build_output(name, trajectory) for name in output_names]
     inputs = [
         InputSpec(
@@ -172,7 +174,14 @@ def _checkpoint_for(
         # row in the first place) -- check for that instead, which needs
         # nothing beyond the already-supported text_present checkpoint.
         name = templatize(inp["name"], params)
-        element_check = ConditionSpec(type="text_present", value=f"{name}:", scope="page")
+        # A leading "* " on the label is often a CSS ::before required-field
+        # marker (e.g. MERIDIAN's `.req:before { content: "* "; }`) -- part
+        # of the computed ACCESSIBLE name label_proximity's own locator
+        # correctly matched against, but invisible to text_present's plain
+        # innerText scan, which only ever sees the real label text itself.
+        # Stripping it here is a no-op for any label that never had one.
+        visible_name = re.sub(r"^\*\s*", "", name)
+        element_check = ConditionSpec(type="text_present", value=f"{visible_name}:", scope="page")
     else:
         name = templatize(inp["name"], params)
         element_check = ConditionSpec(type="element_visible", role=role, name=name)
@@ -297,3 +306,18 @@ def _validate_params_used(steps: list[Step], params: dict[str, str]) -> None:
             f"declared param(s) {unused} were never templatized into any compiled step — "
             "check the --param values exactly match a literal value discovery actually used"
         )
+
+
+def _apply_step_overrides(steps: list[Step], step_overrides: dict[int, dict]) -> None:
+    if not step_overrides:
+        return
+    by_id = {s.step_id: s for s in steps}
+    unknown = [step_id for step_id in step_overrides if step_id not in by_id]
+    if unknown:
+        raise CompilationError(
+            f"policy step_overrides references step_id(s) {unknown} not present in the compiled "
+            f"output (valid step_ids: 1-{len(steps)}) — check the policy against this trajectory's "
+            "actual compiled step order, which can shift if the discovery run changes"
+        )
+    for step_id, override in step_overrides.items():
+        by_id[step_id].escalation_override = override
