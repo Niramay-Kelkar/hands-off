@@ -1,0 +1,102 @@
+Findings for the task's specific question: does the model need to READ
+the member's current e-mail/phone to do this task, or can it overwrite
+blindly?
+
+Checked, not assumed: the Update Member Information form PRE-FILLS its
+three textboxes (E-mail, Phone, Mailing Address) with the member's
+CURRENT values. Confirmed live, empirically, with the standard
+redact_fields set applied (password, E-mail, Phone, Address, Mailing
+Address -- no exclusions): the discovery goal asked for a task that
+updates two fields (E-mail, Phone) with brand-new literal values from
+the goal itself, and explicitly leaves the third (Mailing Address)
+completely untouched. The model completed this successfully despite
+its ENTIRE view of the pre-filled form showing "[REDACTED]" in place of
+all three current values (see trajectory.json step 12's observation) --
+it never needed to know what the old values actually were: setting a
+field just means typing the goal's own new literal value over whatever
+is there, and leaving a field means simply not touching it (its real
+value stays live in the DOM even though the model can't see it).
+
+Conclusion: NO structural tension like Funds Transfer/Place Account
+Hold's Share ID problem. That conflict exists specifically because the
+model has to READ an identifier from the page in order to CHOOSE which
+one to act on (which of 28 shares to transfer from). Here, the new
+value comes entirely from the goal/params, never from observation, so
+full redaction with no exclusions works with zero friction. Every
+redact_fields entry (E-mail, Phone, Mailing Address) stayed fully
+applied throughout this discovery run -- unlike Open New Share and
+Funds Transfer/Place Account Hold, nothing had to be temporarily
+omitted from --redact-fields here.
+
+--- Real redaction bugs found and fixed during this task ---
+
+Three real gaps were found while verifying this capability's own
+evidence, none guessed -- each confirmed live before being fixed, and
+each re-verified live after:
+
+1. agent/redaction.py's row-based label:value path used
+   `sibling.inner_text()` to read a field's current value. That works
+   for plain <td> text (e.g. the member detail page's E-mail/Phone/
+   Address cells) but returns EMPTY STRING for an editable <input> or
+   <textarea> nested inside the sibling cell (inner_text() reflects
+   rendered text NODES, not an input's value attribute) -- so this
+   form's pre-filled E-mail/Phone/Mailing Address values were silently
+   never being masked at all, old or new, despite being declared in
+   --redact-fields. Fixed: falls back to the nested control's
+   input_value() when inner_text() is empty.
+
+2. Even with (1) fixed, a brand NEW value the model TYPES into a
+   redact_fields-labelled field (e.g. the literal "password" typed at
+   every capability's sign-on step, or this capability's new e-mail/
+   phone) was still leaking, in a completely different code path:
+   agent/discovery.py's tool_call-input masking only ever redacts
+   values already visible on the page BEFORE the action runs (from
+   `find_sensitive_fields`'s pre-action page scan) -- it can't catch a
+   value that doesn't exist on the page until the model's own `type`
+   action puts it there. This is project-wide, not specific to this
+   capability: literal "password" was leaking unmasked into every prior
+   capability's discovery trajectory.json (funds_transfer,
+   place_account_hold, open_new_share, sign_on), unnoticed until now.
+   Fixed with a new `_mask_typed_value` step that redacts a `type`/
+   `select` tool call's own value when its target field's LABEL matches
+   a redact_fields entry, plus a `typed_secrets` list (accumulated
+   across the run) so later steps' free text -- especially a `done`
+   summary that narrates back a value it just set, e.g. "updated the
+   e-mail to ada.lovelace+...@example.com" -- also gets masked.
+
+3. Once (2) could mask MULTIPLE distinct fields (password, e-mail,
+   phone) in the same run, a single generic "[REDACTED]" placeholder
+   made them indistinguishable to `agent.compiler`'s templatize() (an
+   exact string match against --param values): every field sharing the
+   literal string "[REDACTED]" collapsed onto whichever declared param
+   happened to equal it first, in dict-iteration order, and the rest
+   failed compilation ("declared param(s) [...] were never
+   templatized"). Fixed by tagging the placeholder with which field it
+   is (`[REDACTED:e-mail]`, `[REDACTED:password]`, ...) -- still
+   unambiguously a placeholder, not real data, but now compile-time
+   `--param password="[REDACTED:password]"` etc. can match the right
+   field. Documented as a required change to the discover -> compile
+   workflow going forward: any capability with a redacted, templatized
+   field must pass the matching `[REDACTED:<field>]` string as its
+   --param value at compile time, not the real secret.
+
+All three were verified against a REAL re-run of discovery (this
+directory's trajectory.json/log.jsonl is the corrected result) --
+0 occurrences of the member's real old e-mail/phone/address, and the
+new e-mail/phone the model typed are `[REDACTED:e-mail]` /
+`[REDACTED:phone]` in every tool_call, with the real values only
+recoverable from `typed_secrets`-masked free text if they'd been
+echoed (they weren't, in this run's `done` summary, but the mechanism
+was separately verified against an earlier run that did echo them).
+
+NOT remediated in this task (flagged, not silently left): every
+EXISTING capability's already-committed evidence (funds_transfer,
+place_account_hold, open_new_share, sign_on) still has the raw literal
+"password" value in its trajectory.json/log.jsonl from before fix (2)
+existed. This is real, low-severity (a demo sandbox credential shared
+across all test accounts, not unique PII), but it's a genuine
+unredacted secret in currently-committed evidence and should be
+remediated -- re-run each capability's discovery for real and recompile
+with the new `[REDACTED:password]` --param convention. Left as a
+follow-up, not done here, since the task in this turn was scoped to the
+two new capabilities.

@@ -68,6 +68,24 @@ def find_sensitive_fields(page: Page, redact_fields: list[str]) -> list[Sensitiv
         if sibling.count() == 0:
             continue
         value = sibling.inner_text().strip()
+        if not value:
+            # A pre-filled/editable <input> or <textarea> (e.g. Update
+            # Member Information's "* E-mail:" / "* Phone:" / "* Mailing
+            # Address:" rows) renders no text NODES of its own -- its
+            # current text lives in the value attribute, which
+            # inner_text() never sees, so this branch silently returned
+            # nothing and left the real value unmasked. Found live: the
+            # member detail page's plain-text E-mail/Phone/Address cells
+            # redact correctly, but the same fields on the editable
+            # Update form -- both the pre-filled current value AND
+            # whatever new value gets typed over it -- did not, until
+            # this fallback to the nested control's actual value.
+            editable = sibling.locator("input, textarea")
+            if editable.count() > 0:
+                try:
+                    value = editable.first.input_value().strip()
+                except Exception:
+                    value = ""
         if value:
             field_name = re.sub(r"\s+", "_", normalized)
             found.append(SensitiveField(field_name=field_name, value=value, locator=sibling))

@@ -1,0 +1,38 @@
+{"ts": "2026-08-27T11:36:29.441925+00:00", "kind": "run_start", "capability_id": "meridian_update_member_information", "version": 1, "params": {"operator_id": "teller1", "password": "[REDACTED]", "branch": "MAIN-001 - Main Office", "member_id": "100234", "e_mail": "not-an-email", "phone": "[REDACTED]"}}
+{"ts": "2026-08-27T11:36:30.415268+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:30.475736+00:00", "kind": "action", "type": "select", "value": "MAIN-001 - Main Office"}
+{"ts": "2026-08-27T11:36:31.544211+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:31.600560+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:31.755812+00:00", "kind": "action", "type": "type", "value": "teller1"}
+{"ts": "2026-08-27T11:36:32.815926+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:32.888841+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:33.001349+00:00", "kind": "action", "type": "type", "value": "[REDACTED]"}
+{"ts": "2026-08-27T11:36:34.073865+00:00", "kind": "checkpoint", "step_id": 3, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:34.139850+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:34.302515+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T11:36:35.384921+00:00", "kind": "checkpoint", "step_id": 4, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:35.455058+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:35.561026+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T11:36:36.608538+00:00", "kind": "checkpoint", "step_id": 5, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:36.768441+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:36.809906+00:00", "kind": "action", "type": "type", "value": "100234"}
+{"ts": "2026-08-27T11:36:37.858048+00:00", "kind": "checkpoint", "step_id": 6, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:37.904287+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:38.131226+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T11:36:39.232400+00:00", "kind": "checkpoint", "step_id": 7, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:39.323350+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:39.659619+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T11:36:40.850342+00:00", "kind": "checkpoint", "step_id": 8, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:41.025208+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:41.154757+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T11:36:42.221935+00:00", "kind": "checkpoint", "step_id": 9, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:42.383146+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:42.443113+00:00", "kind": "action", "type": "type", "value": "[REDACTED]"}
+{"ts": "2026-08-27T11:36:43.517654+00:00", "kind": "checkpoint", "step_id": 10, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:43.578800+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:43.647177+00:00", "kind": "action", "type": "type", "value": "[REDACTED]"}
+{"ts": "2026-08-27T11:36:44.717747+00:00", "kind": "checkpoint", "step_id": 11, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T11:36:44.781141+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T11:36:44.894688+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T11:36:47.921751+00:00", "kind": "checkpoint", "step_id": 12, "matched": true, "outcome_code": "INVALID_EMAIL_FORMAT", "detail": null}
+{"ts": "2026-08-27T11:36:47.939814+00:00", "kind": "run_end", "status": "business_outcome"}

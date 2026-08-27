@@ -1,0 +1,42 @@
+?inject= exploration against the Update Member Information route, real
+requests against https://web-sample.interface-hiring.com, signed on as
+teller1.
+
+--- ?inject=validation ---
+GET /members/100234/update?inject=validation -> HTTP 400
+
+  TRANSACTION REJECTED
+
+  The transaction could not be completed as entered. Please review the
+  field values and resubmit.
+
+Same shared host-level rejection text as every other MERIDIAN mutating
+route. Added as this capability's own VALIDATION_ERROR outcome.
+
+--- Real, non-injected format-validation rejections ---
+Two distinct real rejections captured live (not ?inject= -- the app's
+own field-level validation), each with specific, actionable text:
+
+  Save Changes with E-mail = "not-an-email" ->
+    UPDATE MEMBER INFORMATION
+    Please correct the following:
+    E-mail address is not in a valid format.
+
+  Save Changes with Phone = "12345" ->
+    UPDATE MEMBER INFORMATION
+    Please correct the following:
+    Phone number is not valid.
+
+Authored as two SEPARATE outcomes (INVALID_EMAIL_FORMAT /
+INVALID_PHONE_FORMAT) rather than one shared VALIDATION_ERROR, since
+each message specifically names the offending field -- more actionable
+than collapsing them into the generic host-level rejection text, and
+the two are trivially distinguishable by real, distinct substrings.
+Both replay-tested for real; see ../replays/invalid_email_format/ and
+../replays/invalid_phone_format/.
+
+--- No review/confirm step, unlike Transfer/Hold/Open New Share ---
+Save Changes posts directly -- there is no intermediate CONFIRM screen
+with a second submit button. The task's phrasing implied one ("-> review
+-> post"), but the live app doesn't have one for this route; built to
+match what the app actually does, not the assumed shape.

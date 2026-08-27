@@ -1345,4 +1345,160 @@ its own `summary.txt` covering the two findings above),
 `replays/success/`, `replays/minimum_deposit_not_met/`,
 `injects/summary.txt`.
 
+**Committed:** `b88d305`.
+
+---
+
+## 2026-08-27 — Fix: `type`/`select` tool-call values and pre-filled `<input>`s never actually redacted
+
+Found building MERIDIAN Update Member Information — its E-mail/Phone/
+Mailing Address textboxes are PRE-FILLED with the member's current
+value (unlike every prior form, which only ever showed sensitive data
+as plain `<td>` text or `<select>` options). Verifying that evidence
+surfaced three real, previously-undetected redaction gaps.
+
+**Gap 1 — `<input>`/`<textarea>` values were never read.** The
+row-based path's value extraction used `sibling.inner_text()`, which
+reflects rendered text NODES — empty for an `<input>`, whose current
+text lives in its `value` attribute instead. So a pre-filled sensitive
+field's value silently never matched `find_sensitive_fields` at all,
+even with the correct label declared. Confirmed live: the member detail
+page's plain-text E-mail/Phone/Address cells redact correctly; the
+identical values on the Update form's editable textboxes did not.
+Fixed: falls back to the nested `input`/`textarea`'s `input_value()`
+when `inner_text()` is empty.
+
+**Gap 2 — a newly-typed value was never redacted, project-wide, not
+just here.** `agent/discovery.py` computes `sensitive =
+find_sensitive_fields(page, redact_fields)` from the page's PRE-action
+state, then uses it to mask both the model's free text and the tool
+call's own input — so a value the model is ABOUT to type for the first
+time (never yet visible on the page) has nothing to match against.
+Checked how far this reached: the literal `"password"` typed at every
+single capability's sign-on step has been leaking unmasked into
+`trajectory.json`/`log.jsonl` since the very first `sign_on` capability
+— confirmed present, unredacted, in `funds_transfer`, `place_account_hold`,
+and `open_new_share`'s already-committed discovery evidence (an earlier
+grep that seemed to show it redacted was checking for single-quoted
+Python-repr text against a double-quoted JSON file — a false negative,
+not a real check). Fixed with a new `_mask_typed_value` step: for a
+`type`/`select` tool call, if the target field's own `name` (accessible
+label) matches a `redact_fields` entry, mask `value` regardless of
+whether it was ever previously observed. A `typed_secrets` list,
+accumulated across the whole run, carries each masked raw value forward
+so later steps' free text can also catch it — needed because a `done`
+summary narrating back what it just did (e.g. "updated the e-mail to
+ada.lovelace+...@example.com") is exactly the kind of echo `model_text`
+masking already existed for, just never wired up to values that were
+typed rather than read.
+
+**Gap 3 — a bare `"[REDACTED]"` broke `agent.compiler`'s templatize()
+once more than one field could be masked in one run.**
+`templatize()`'s exact-value match against `--param` silently
+collapsed every field sharing the identical placeholder string onto
+whichever declared param happened to equal it first (dict-iteration
+order) — `password`, `e_mail`, and `phone` all being `"[REDACTED]"`
+meant only one of the three could ever compile; the rest failed with
+"declared param(s) [...] were never templatized". Fixed by tagging the
+placeholder per field (`[REDACTED:password]`, `[REDACTED:e-mail]`,
+`[REDACTED:phone]`) — still unambiguously a placeholder, not real data,
+but now distinguishable. This is a required change to the
+discover → compile workflow going forward: a redacted, templatized
+field's compile-time `--param` must be the matching `[REDACTED:<field>]`
+string, not the real secret (which also means the real secret no longer
+needs to pass through the compile CLI's argv at all — a small,
+unplanned privacy improvement).
+
+All three fixed at the source (`agent/redaction.py`,
+`agent/discovery.py`), each re-verified against a REAL re-run of the
+Update Member Information discovery (iterated several times narrowing
+down the exact leak — see `evidence/meridian/update_member_information/discovery/summary.txt`
+for the full before/after). **Not remediated in this task**: every
+already-committed capability's evidence still carries the raw
+`"password"` string from before Gap 2 existed — flagged as a real,
+low-severity (shared demo credential, not unique PII) follow-up, not
+silently left unmentioned.
+
+**Risk-gate conflict, surfaced and resolved with the user, then
+reverted.** The task originally asked for `risk_class: mutating,
+requires_confirmation: false` on Update Member Information, so its
+writes (format-validated by the host, trivially correctable) would
+skip the pre-action pause Transfer/Hold/Open New Share all get. But
+`agent/engine.py`'s risk gate was `if artifact.risk_class != "read_only"
+or artifact.guardrails.requires_confirmation` — so ANY non-read_only
+capability paused regardless of `requires_confirmation`, by original
+design (CLAUDE.md: risk_class alone was meant to be sufficient,
+`requires_confirmation` an additional/redundant signal, not a
+substitute). Asked the user how to resolve it rather than silently
+picking a side; the user approved changing the gate to key off
+`requires_confirmation` alone, verified safe at the time (every
+existing mutating capability already declared `requires_confirmation:
+true` explicitly, so their behavior was unchanged) — but the user then
+came back and called this a mistake on their end, not an intentional
+architecture change: risk_class alone being sufficient to gate is a
+proven, deliberate safety property from the original take-home and
+shouldn't have been touched. **Reverted**: `agent/engine.py` is back to
+the exact original condition (`git diff agent/engine.py` against the
+pre-task commit is empty); `update_member_information.policy.json`'s
+`requires_confirmation` is `true`, matching every other mutating
+capability, recompiled. All FOUR mutating capabilities
+(`funds_transfer`, `place_account_hold`, `open_new_share`,
+`update_member_information`) were replay-verified fresh under the
+reverted logic — each capturing the real `sessions.db` row BEFORE
+resuming, not assumed from the flag: all four show `status: "paused"`,
+`current_step_id: 0`, `pause_reason: "risk_confirmation_required"`,
+`owner: "human"`, then complete `status: "success"` after resume
+(`CN480007`/`CN480008`/`CN480009`/`"MEMBER INFORMATION UPDATED"`).
+
+**Committed:** pending, together with Update Member Information below.
+
+---
+
+## 2026-08-27 — MERIDIAN Update Member Information capability
+
+`risk_class: mutating`, `requires_confirmation: true` — same pre-action
+risk gate as every other mutating capability (see the risk-gate
+conflict/revert above). Replay-verified: real `sessions.db` row shows
+`status: "paused"`, `current_step_id: 0`, `pause_reason:
+"risk_confirmation_required"` before resume, `status: "success"` after.
+
+**The task's specific question — does the model need to READ the
+current e-mail/phone, or can it overwrite blindly?** Checked live, not
+assumed: it can overwrite blindly. The form pre-fills all three fields
+with current values, but the discovery goal (update E-mail + Phone with
+brand-new literal values from the goal itself, leave Mailing Address
+completely untouched) completed successfully with the FULL standard
+redact_fields set applied and zero exclusions — the model never needed
+to know what the old values were, since setting a field only requires
+knowing the NEW value (from the goal/params, never from observation)
+and leaving a field alone requires no read at all. No structural
+tension like Share ID's, and said so explicitly rather than assuming it
+from the form shape alone.
+
+**No review/confirm step** — unlike Transfer/Hold/Open New Share's
+Continue → Review → Post shape (which the task's own phrasing assumed
+this capability would also have), Save Changes posts directly; built to
+match what the live app actually does.
+
+Two field-specific format-validation outcomes authored as SEPARATE
+outcomes (not one shared `VALIDATION_ERROR`), since the task explicitly
+left this as a judgment call and each real rejection names its specific
+field: `INVALID_EMAIL_FORMAT` (`"E-mail address is not in a valid
+format."`) and `INVALID_PHONE_FORMAT` (`"Phone number is not valid."`),
+both captured from real live submissions, not guessed. Plus the shared
+`VALIDATION_ERROR` (real `?inject=validation` text) and
+`INVALID_CREDENTIALS`.
+
+All four cases replay-tested for real: happy path → `status: "success"`;
+invalid e-mail → `business_outcome`/`INVALID_EMAIL_FORMAT`; invalid
+phone → `business_outcome`/`INVALID_PHONE_FORMAT`; `?inject=validation`
+confirmed directly against the live route, matches the declared
+`VALIDATION_ERROR` text exactly.
+
+Evidence under `evidence/meridian/update_member_information/`:
+`discovery/` (with its own detailed `summary.txt` — the redaction bug
+chain above was found and fixed WHILE producing this capability's
+evidence), `replays/success/`, `replays/invalid_email_format/`,
+`replays/invalid_phone_format/`, `injects/summary.txt`.
+
 **Committed:** pending.

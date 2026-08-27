@@ -9,6 +9,7 @@ fed back to it carries a concrete detail message, success or failure.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -67,6 +68,7 @@ def run_discovery(
     # "Share ID", which password/ssn/account_number/token/secret alone
     # don't cover).
     redact_fields = list(dict.fromkeys(DEFAULT_REDACT_FIELDS + list(redact_fields or [])))
+    redact_labels = {redaction.normalize_label(f) for f in redact_fields}
 
     run_id = evidence.new_run_id("discover")
     rdir = evidence.run_dir(run_id)
@@ -114,6 +116,7 @@ def run_discovery(
         log.event("observation", step_index=0, observation=observation)
 
         messages: list[dict] = [{"role": "user", "content": f"Goal: {goal}\n\nCurrent page:\n{observation}"}]
+        typed_secrets: list[redaction.SensitiveField] = []
 
         try:
             for step_index in range(1, max_steps + 1):
@@ -130,8 +133,17 @@ def run_discovery(
                 tool_use = next((b for b in response.content if b.type == "tool_use"), None)
                 model_text = "\n".join(b.text for b in response.content if b.type == "text")
 
+                # `sensitive` only ever covers values ALREADY visible on the
+                # page before this turn's action runs; `typed_secrets`
+                # (accumulated below, across the whole run) additionally
+                # covers values the model typed into a redact_fields-labelled
+                # field on an EARLIER step -- e.g. a `done` summary or later
+                # model_text that narrates back an e-mail/phone it just set,
+                # which `sensitive` alone can't catch since that value never
+                # existed on the page until the model itself put it there.
                 sensitive = redaction.find_sensitive_fields(page, redact_fields)
-                model_text = redaction.mask_text(model_text, sensitive)
+                mask_set = sensitive + typed_secrets
+                model_text = redaction.mask_text(model_text, mask_set)
                 screenshot_path = evidence.save_screenshot(
                     page, rdir, step_index, "step", mask_locators=[f.locator for f in sensitive]
                 )
@@ -143,7 +155,7 @@ def run_discovery(
                     trajectory.final_summary = "model turn produced no tool call"
                     break
 
-                # Masked with the same `sensitive` list used for model_text/screenshots
+                # Masked with the same `mask_set` used for model_text/screenshots
                 # above, and applied here (once, before either persistence path) rather
                 # than relying on StepLogWriter's own value-redaction pass in
                 # agent/evidence.py -- that pass keys its lookup by field_name, so when
@@ -152,10 +164,18 @@ def run_discovery(
                 # field like `done`'s free-text summary is the one place the model can
                 # echo back page content it just read, the same risk model_text already
                 # covers -- click/navigate results are otherwise fixed template strings.
-                masked_input = _mask_tool_input(tool_use.input, sensitive)
+                masked_input = _mask_tool_input(tool_use.input, mask_set)
+                # Mutates typed_secrets in place with THIS step's own raw
+                # value (if any) BEFORE outcome.detail is masked below --
+                # e.g. the `type` action's own result template
+                # ("typed 'ada.lovelace@example.com' into ...") echoes back
+                # the exact literal value tool_use.input carried, and that
+                # value cannot be in `mask_set` from the top of this loop
+                # iteration, since it didn't exist anywhere until this call.
+                masked_input = _mask_typed_value(masked_input, tool_use.name, redact_labels, typed_secrets)
                 log.event("tool_call", step_index=step_index, name=tool_use.name, input=masked_input)
                 outcome = _dispatch(tool_use.name, tool_use.input, ctx)
-                masked_detail = redaction.mask_text(outcome.detail, sensitive)
+                masked_detail = redaction.mask_text(outcome.detail, sensitive + typed_secrets)
                 log.event("tool_result", step_index=step_index, ok=outcome.ok, detail=masked_detail)
 
                 trajectory.steps.append(
@@ -220,6 +240,62 @@ def _mask_tool_input(value: Any, fields: list) -> Any:
     if isinstance(value, list):
         return [_mask_tool_input(v, fields) for v in value]
     return value
+
+
+def _mask_typed_value(
+    masked_input: Any, tool_name: str, redact_labels: set[str], typed_secrets: list
+) -> Any:
+    """Masks a `type`/`select` tool call's own `value` when its target
+    field's `name` (accessible label) matches a redact_fields entry --
+    independent of `_mask_tool_input`/`sensitive`, which can only mask a
+    value that was ALREADY visible on the page BEFORE this action runs.
+
+    Found live: `sensitive` (agent.redaction.find_sensitive_fields) is
+    computed from the page's PRE-action state, so for a brand-new value
+    the model is about to type into a field for the first time -- e.g.
+    the literal "password" typed into every capability's Password field,
+    or a new e-mail/phone typed into Update Member Information's form --
+    there was nothing yet on the page for `sensitive` to have found, so
+    `_mask_tool_input`'s substring replace had nothing to match and the
+    raw value went straight into the trajectory. This masks by LABEL
+    instead of by previously-observed VALUE, which is the only thing
+    that can catch a value that has never appeared on the page before.
+
+    Before masking, the raw value is appended to `typed_secrets` (mutated
+    in place) so later steps' model_text/tool_result/`done` summary --
+    which might narrate this same value back in free text -- can also
+    catch it via the same value-substring masking `sensitive` already
+    gets, even though it never appeared as a `find_sensitive_fields`
+    page-scan result.
+    """
+    if tool_name not in ("type", "select") or not isinstance(masked_input, dict):
+        return masked_input
+    field_label = masked_input.get("name")
+    raw_value = masked_input.get("value")
+    if not isinstance(field_label, str) or not isinstance(raw_value, str) or not raw_value:
+        return masked_input
+    label = field_label.strip()
+    if label.startswith("*"):
+        label = label[1:].strip()
+    if label.endswith(":"):
+        label = label[:-1].strip()
+    normalized = redaction.normalize_label(label)
+    if normalized in redact_labels:
+        field_name = re.sub(r"\s+", "_", normalized)
+        typed_secrets.append(redaction.SensitiveField(field_name=field_name, value=raw_value, locator=None))
+        # Field-specific placeholder, not a bare "[REDACTED]" -- a bare
+        # placeholder would collapse every redacted field (e.g. password
+        # AND a freshly-typed e-mail AND phone) to the identical literal
+        # string, which breaks agent.compiler's templatize() (exact-value
+        # match against --param): with several distinct params all equal
+        # to the same placeholder, the first one in dict-iteration order
+        # silently wins every match, and the rest report as "never
+        # templatized". Tagging the placeholder with which field it is
+        # keeps each one distinguishable for a `--param name="[REDACTED:name]"`
+        # compile-time match, while still being unambiguously a
+        # placeholder, not real data, to a human reading the trajectory.
+        return {**masked_input, "value": f"[REDACTED:{field_name}]"}
+    return masked_input
 
 
 def _dispatch(name: str, tool_input: dict, ctx: DiscoveryContext) -> ToolOutcome:
