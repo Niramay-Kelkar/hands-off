@@ -53,6 +53,7 @@ def find_sensitive_fields(page: Page, redact_fields: list[str]) -> list[Sensitiv
             found.append(SensitiveField(field_name=normalized, value=value, locator=sibling))
 
     found.extend(_find_column_fields(page, wanted))
+    found.extend(_find_select_option_fields(page, wanted))
     return found
 
 
@@ -103,6 +104,62 @@ def _find_column_fields(page: Page, wanted: set[str]) -> list[SensitiveField]:
                 value = cell.inner_text().strip()
                 if value:
                     found.append(SensitiveField(field_name=field_name, value=value, locator=cell))
+
+    return found
+
+
+def _find_select_option_fields(page: Page, wanted: set[str]) -> list[SensitiveField]:
+    """Third detection path, for a <select> whose <option> list enumerates
+    sensitive values directly (e.g. a Funds Transfer form's From/To Share
+    dropdowns) -- neither of the two paths above can see these: there's no
+    label CELL ending in ':' next to a single value (the label sits next
+    to the whole <select>, not a value), and there's no <table> at all for
+    the column-header path to scan.
+
+    Matching is by word overlap between the enclosing row's label and a
+    redact_fields entry (e.g. row label "From Share" / "To Share" and
+    config entry "Share ID" both contain "share"), not an exact-string
+    match like the two paths above -- deliberately looser, since the
+    field being selected (a specific share) and the identifier concept
+    being protected (its Share ID) are two different phrasings of the
+    same underlying data, not the same label text repeated. Each
+    option's identifier is its `value` attribute (e.g.
+    `<option value="100234-S0001">100234-S0001 - Regular Shares
+    ($1,500.00)</option>`) -- exact and unambiguous, unlike parsing it
+    back out of the option's display text.
+    """
+    found: list[SensitiveField] = []
+    selects = page.locator("select")
+    for i in range(selects.count()):
+        select = selects.nth(i)
+        row = select.locator("xpath=ancestor::tr[1]")
+        if row.count() == 0:
+            continue
+        label_cell = row.locator("xpath=./td[1] | ./th[1]")
+        if label_cell.count() == 0:
+            continue
+        label_text = label_cell.first.inner_text().strip().lower()
+        label_words = set(re.findall(r"[a-z]+", label_text))
+        matched_phrase = next((phrase for phrase in wanted if label_words & set(phrase.split())), None)
+        if matched_phrase is None:
+            continue
+
+        field_name = re.sub(r"\s+", "_", matched_phrase)
+        options = select.locator("option")
+        for j in range(options.count()):
+            opt = options.nth(j)
+            value = opt.get_attribute("value") or ""
+            if value:
+                # Locator is the <select> itself, not this <option> -- a
+                # closed <select> only ever visibly renders its currently
+                # chosen option's text; the option elements have no
+                # bounding box of their own for a screenshot's mask= to
+                # paint over. Masking the whole control instead actually
+                # hides whatever it's currently showing, which is the
+                # real screenshot risk (mask_text's substring replace,
+                # used for trajectory/log text, still keys off `value`
+                # and is unaffected by this choice).
+                found.append(SensitiveField(field_name=field_name, value=value, locator=select))
 
     return found
 
