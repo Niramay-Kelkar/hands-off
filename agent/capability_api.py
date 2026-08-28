@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -575,7 +576,14 @@ def _public(run: dict, *, with_events: bool = False) -> dict:
         screenshots = []
         shot_dir = run["_dir"] / "screenshots"
         if shot_dir.is_dir():
-            screenshots = sorted(p.name for p in shot_dir.iterdir() if p.suffix == ".png")
+            def _step_num(name: str) -> float:
+                m = re.match(r"step_(\d+)_", name)
+                return int(m.group(1)) if m else float("inf")
+
+            screenshots = sorted(
+                (p.name for p in shot_dir.iterdir() if p.suffix == ".png"),
+                key=_step_num,
+            )
         events = []
         prev_ts = None
         for e in run["_events"]:
