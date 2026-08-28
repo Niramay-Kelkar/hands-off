@@ -191,6 +191,58 @@ python -m agent.capability_api   # serves http://localhost:8200
 `POST /capabilities/<id>/invoke` runs one with a flat JSON params body.
 See CLAUDE.md for details.
 
+## Running the MERIDIAN CORE Adaptation Demo
+
+### Prerequisites
+- Python 3.8+
+- Anthropic API key (for chatbot's Claude Sonnet): export ANTHROPIC_API_KEY=...
+- Browser (Chrome/Edge recommended for Playwright)
+
+### Quick start (MERIDIAN demo, localhost:8200)
+
+Terminal 1: Start the capability API server (MERIDIAN is default)
+python -m agent.capability_api
+Logs: Loaded MERIDIAN capabilities (TARGET_SYSTEM=meridian): meridian_member_balance_inquiry, ...
+
+Terminal 2: Open browser
+http://localhost:8200/
+Unified Chat/Dashboard interface opens
+
+### Demo flows
+
+Read-only (5 mins):
+Chat: "What's the balance for member 100234?"
+Expected: Balance + member name
+Dashboard tab: New run appears with screenshots in correct step order
+
+Mutating with inline confirm (10 mins):
+Chat: "Open a new share for member 100234"
+Expected: Risk-gate pause -> bot asks "confirm?" -> type "yes" -> completes with confirmation number
+Dashboard tab: New run appears (status: success)
+
+Permission escalation + supervisor takeover (15 mins):
+Chat: "Place a hold on member 100234's account" (teller1)
+Expected: Risk-gate pause -> "yes" -> resume -> step 12 fails (403) -> chatbot reports "supervisor needed"
+
+Supervisor resumes via:
+curl -X POST http://localhost:8200/api/runs/<run_id>/supervisor-resume -H "Content-Type: application/json" -d '{"supervisor_id": "super1", "password": "<password>", "branch": "<branch>"}'
+
+Expected: Same browser window completes the hold with confirmation number
+Dashboard tab: Run appears (status: success, owner: supervisor)
+
+### Fallback (test against target_app fixture)
+
+TARGET_SYSTEM=target_app python -m agent.capability_api
+Chatbot now drives the local target_app fixture instead of MERIDIAN
+
+### Full CLI verify
+
+python -m agent.replay --capability meridian_member_balance_inquiry --params member_id=100234
+python -m agent.replay --capability meridian_place_account_hold --params member_id=100234,share=100234-MMKT-3,reason="Testing"
+python -m agent.replay --supervisor-resume <run_id> --input supervisor_id=super1 password=<password> branch=<branch>
+
+See MERIDIAN_ADAPTATION_REPORT.md for full technical detail.
+
 ## Running without live services
 
 The discovery step requires a live LLM API key. Replay does not call the

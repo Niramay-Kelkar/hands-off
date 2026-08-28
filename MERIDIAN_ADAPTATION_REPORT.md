@@ -205,6 +205,37 @@ Single entry point: `localhost:8200/app` — unified page, Chat and Dashboard ta
   operator console, where a supervisor can sign on within the same live session
   and complete the hold.
 
+## Supervisor Takeover (Reactive Escalation Completion)
+
+The most significant extension for this adaptation is the supervisor-takeover capability — enabling a real human supervisor to complete a transaction that the automated teller agent could not.
+
+What happens:
+1. Teller1's automation runs "Place a hold" against member 100234's account
+2. All steps 1–11 complete successfully (sign-on, navigate, select share)
+3. Step 12 attempts to click "Apply Hold" but fails (HTTP 403 permission rejected) — only supervisors can apply holds
+4. The system correctly pauses and escalates: pause_reason: on_checkpoint_failure, owner: human
+5. Chatbot detects this reactive escalation and reports: "This action requires supervisor privileges. Supervisor takeover needed."
+6. A supervisor (super1) invokes POST /api/runs/<run_id>/supervisor-resume with their credentials
+7. The system:
+   - CDP-attaches to the exact same live browser session that teller1's automation was running in
+   - Signs on as super1 (same sign-on page, same Playwright browser, same session)
+   - Re-navigates to the hold context (member, share, reason)
+   - Re-attempts step 12: "Apply Hold" — this time, it succeeds (supervisor has permission)
+   - Captures the confirmation checkpoint (hold_confirmation: "CN480104")
+   - Writes status=success, owner=supervisor to sessions.db
+8. The chatbot reports completion with the confirmation number — the same run that paused is now complete
+
+Technical approach:
+- No engine.py changes: escalation resumption is driven entirely via agent/actions.py/locator.py/checkpoint.py primitives directly (CDP-attach + action replay), not through the engine's step-loop
+- Same live session: the browser that teller1's Playwright automation was controlling is the exact browser the supervisor takes over in
+- Evidence trail preserved: both the teller's failed attempt (with screenshots) and the supervisor's successful completion are logged in the same run's log.jsonl, so the full forensics are visible in the dashboard
+
+Verified live:
+- Programmatic path: e2e_supervisor.py (teller -> escalation -> supervisor-resume -> confirmation_number CN480104)
+- Human-driven path: chatbot reports escalation, supervisor manually invokes endpoint via curl, same browser completes (confirmation_number CN480105)
+
+This is the literal, production-grade version of the original take-home's core promise: a human-in-the-loop escalation that truly completes work in the same live session, not a synthetic restart or a separate flow.
+
 ## What Was Deliberately Cut
 
 - Live testing of idle-session timeout.
