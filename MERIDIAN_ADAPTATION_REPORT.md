@@ -246,6 +246,10 @@ This is the literal, production-grade version of the original take-home's core p
   control).
 - Chatbot streaming and multi-user/shared state — in-memory per-session history
   only.
+- **Member inquiry — last-name search:** The MERIDIAN member-inquiry screen supports both 
+  "Search by Member Number" and "Search by Last Name" methods, reaching the same member-record 
+  destination. The compiled capability was recorded for member-number search only; last-name 
+  search was not separately compiled and is not currently supported via the chatbot.
 
 ## What's Next
 

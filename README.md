@@ -193,6 +193,14 @@ See CLAUDE.md for details.
 
 ## Running the MERIDIAN CORE Adaptation Demo
 
+### Note on environment setup
+
+The `agent.capability_api` chatbot reads `ANTHROPIC_API_KEY` from your shell's 
+environment, not from `.env`. Make sure to export it before starting the server:
+
+export ANTHROPIC_API_KEY="sk-ant-..."
+python -m agent.capability_api
+
 ### Prerequisites
 - Python 3.8+
 - Anthropic API key (for chatbot's Claude Sonnet): export ANTHROPIC_API_KEY=...
@@ -247,9 +255,17 @@ TARGET_SYSTEM=target_app python -m agent.capability_api
 ### Full CLI verify
 
 ```bash
-python -m agent.replay --capability meridian_member_balance_inquiry --params member_id=100234
-python -m agent.replay --capability meridian_place_account_hold --params member_id=100234,share=100234-MMKT-3,reason="Testing"
-python -m agent.replay --supervisor-resume <run_id> --input supervisor_id=super1 password=<password> branch=<branch>
+python -m agent.replay \
+  --capability schema/capabilities/meridian/member_balance_inquiry.compiled.json \
+  --input operator_id=<user> --input password=<password> \
+  --input branch="MAIN-001 - Main Office" --input member_id=100234
+python -m agent.replay \
+  --capability schema/capabilities/meridian/place_account_hold.compiled.json \
+  --input operator_id=<user> --input password=<password> \
+  --input branch="MAIN-001 - Main Office" \
+  --input member_id=100234 --input share="100234-MMKT-3" --input reason="Testing"
+python -m agent.replay --supervisor-resume <run_id> \
+  --input supervisor_id=<user> --input password=<password> --input branch="MAIN-001 - Main Office"
 ```
 
 See MERIDIAN_ADAPTATION_REPORT.md for full technical detail.
