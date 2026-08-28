@@ -200,13 +200,17 @@ See CLAUDE.md for details.
 
 ### Quick start (MERIDIAN demo, localhost:8200)
 
-Terminal 1: Start the capability API server (MERIDIAN is default)
+```bash
+# Terminal 1: Start the capability API server (MERIDIAN is default)
 python -m agent.capability_api
-Logs: Loaded MERIDIAN capabilities (TARGET_SYSTEM=meridian): meridian_member_balance_inquiry, ...
+# Logs: Loaded MERIDIAN capabilities (TARGET_SYSTEM=meridian): meridian_member_balance_inquiry, ...
+```
 
-Terminal 2: Open browser
+```bash
+# Terminal 2: Open browser
 http://localhost:8200/
-Unified Chat/Dashboard interface opens
+# Unified Chat/Dashboard interface opens
+```
 
 ### Demo flows
 
@@ -225,21 +229,28 @@ Chat: "Place a hold on member 100234's account" (teller1)
 Expected: Risk-gate pause -> "yes" -> resume -> step 12 fails (403) -> chatbot reports "supervisor needed"
 
 Supervisor resumes via:
+
+```bash
 curl -X POST http://localhost:8200/api/runs/<run_id>/supervisor-resume -H "Content-Type: application/json" -d '{"supervisor_id": "super1", "password": "<password>", "branch": "<branch>"}'
+```
 
 Expected: Same browser window completes the hold with confirmation number
 Dashboard tab: Run appears (status: success, owner: supervisor)
 
 ### Fallback (test against target_app fixture)
 
+```bash
 TARGET_SYSTEM=target_app python -m agent.capability_api
-Chatbot now drives the local target_app fixture instead of MERIDIAN
+# Chatbot now drives the local target_app fixture instead of MERIDIAN
+```
 
 ### Full CLI verify
 
+```bash
 python -m agent.replay --capability meridian_member_balance_inquiry --params member_id=100234
 python -m agent.replay --capability meridian_place_account_hold --params member_id=100234,share=100234-MMKT-3,reason="Testing"
 python -m agent.replay --supervisor-resume <run_id> --input supervisor_id=super1 password=<password> branch=<branch>
+```
 
 See MERIDIAN_ADAPTATION_REPORT.md for full technical detail.
 
