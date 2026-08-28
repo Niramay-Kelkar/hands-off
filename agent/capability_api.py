@@ -42,11 +42,33 @@ CAPABILITIES_DIR = Path("schema/capabilities")
 OPERATOR_CONSOLE_URL = os.environ.get("OPERATOR_CONSOLE_URL", "http://127.0.0.1:8100")
 SELF_URL = os.environ.get("CAPABILITY_API_URL", "http://127.0.0.1:8200")
 CHAT_MODEL = os.environ.get("CHAT_MODEL", "claude-sonnet-5")
-# Optional comma-separated allowlist of capability_ids the chatbot may offer.
-# Unset -> the chatbot sees the whole catalog. Set it to scope a demo to one
-# family of capabilities (e.g. the MERIDIAN set) so the model can't pick a
+# Which target system the chatbot is scoped to, so the model can't pick a
 # same-sounding capability whose backing system isn't running.
-CHAT_CAPABILITIES = [c.strip() for c in os.environ.get("CHAT_CAPABILITIES", "").split(",") if c.strip()]
+#   TARGET_SYSTEM unset / empty / "meridian" -> the six MERIDIAN capabilities
+#   TARGET_SYSTEM="target_app"               -> the original member_balance_lookup
+_MERIDIAN_CAPABILITIES = [
+    "meridian_member_balance_inquiry",
+    "meridian_open_new_share",
+    "meridian_place_account_hold",
+    "meridian_funds_transfer",
+    "meridian_sign_on",
+    "meridian_update_member_information",
+]
+_TARGET_APP_CAPABILITIES = ["member_balance_lookup"]
+
+TARGET_SYSTEM = os.environ.get("TARGET_SYSTEM", "").strip().lower() or "meridian"
+if TARGET_SYSTEM == "target_app":
+    _TARGET_LABEL = "target_app"
+    _ACTIVE_CAPABILITIES = _TARGET_APP_CAPABILITIES
+else:
+    TARGET_SYSTEM = "meridian"
+    _TARGET_LABEL = "MERIDIAN"
+    _ACTIVE_CAPABILITIES = _MERIDIAN_CAPABILITIES
+
+# Optional explicit comma-separated allowlist; overrides TARGET_SYSTEM's default set.
+CHAT_CAPABILITIES = [
+    c.strip() for c in os.environ.get("CHAT_CAPABILITIES", "").split(",") if c.strip()
+] or _ACTIVE_CAPABILITIES
 
 app = Flask(__name__)
 
@@ -797,4 +819,8 @@ showTab(location.pathname.indexOf("dashboard") !== -1 ? "dashboard" : "chat");
 
 
 if __name__ == "__main__":
+    print(
+        f"Loaded {_TARGET_LABEL} capabilities "
+        f"(TARGET_SYSTEM={TARGET_SYSTEM}): {', '.join(CHAT_CAPABILITIES)}"
+    )
     app.run(host=os.environ.get("FLASK_RUN_HOST", "127.0.0.1"), port=8200, debug=True, threaded=True)
