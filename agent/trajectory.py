@@ -28,6 +28,7 @@ class TrajectoryStep(BaseModel):
     tool_call: dict[str, Any]
     tool_result: dict[str, Any]
     extract_label: str | None = None
+    resolved_via: str | None = None
 
 
 TrajectoryStatus = Literal["running", "done", "max_steps_reached", "hard_failure"]

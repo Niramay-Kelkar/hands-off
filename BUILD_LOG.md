@@ -1073,3 +1073,432 @@ reason above, so the actual proof this fix works is the next GitHub
 Actions run, not local verification.
 
 **Committed:** pending.
+
+---
+
+## 2026-08-27 — Redaction: exact-match select/option detection
+
+**Redaction tightening.** `_find_select_option_fields` (`agent/redaction.py`)
+previously matched a `<select>`'s enclosing row label against
+`redact_fields` by word overlap ("From Share" / "To Share" both contain
+"share", so they matched a bare "Share ID" entry) — looser than every
+other detection path in the module, which all do exact normalized-string
+matching. Changed to exact match: normalize the label (lowercase, strip
+trailing `:`, collapse whitespace) and require it to equal an entry in
+`redact_fields` exactly. This requires the caller to declare a field
+under the label it actually appears as, so
+`schema/capabilities/meridian/funds_transfer.policy.json` gained
+explicit `"From Share"` / `"To Share"` entries alongside the existing
+`"Share ID"` (used by the column-header path on the member detail
+page). Recompiled `funds_transfer.compiled.json` from its original
+`source_run_id` with the updated policy — diffed against the prior
+compiled artifact and confirmed the *only* change is the
+`evidence_policy.redact_fields` list gaining the two new entries; every
+step/locator/checkpoint is byte-identical.
+
+This change had a real, non-obvious regression — `_find_column_fields`
+started mis-firing on the very same new `redact_fields` entries,
+producing a visibly broken masked screenshot. Caught in review, fixed,
+and re-verified with fresh live evidence — see the next entry, which is
+the actual fix and the evidence for both changes together.
+
+**Committed:** pending.
+
+---
+
+## 2026-08-27 — Fix: `_find_column_fields` mis-fired on the new "From Share"/"To Share" entries
+
+User spot-checked `evidence/meridian/funds_transfer/discovery_redaction_check/screenshots/step_15_step.png`
+from the exact-match redaction change above and caught a real defect: a
+huge black box covering the *label* column ("To Share:", "Amount:",
+"Memo:" text itself, not their values) rather than just the "To Share"
+select's value box.
+
+**Root cause:** `_find_column_fields` (the column-header detection path,
+for grids like the member detail page's "Share ID | Type | Balance |
+Status") normalizes a header cell's text by stripping a trailing `:`
+before matching against `redact_fields` — meant to tolerate either
+header style. The Funds Transfer form's own field table is a 2-column
+vertical label:value form (row 0 = `"From Share:"` / `<select>`, row 1 =
+`"To Share:"` / `<select>`, etc.) — structurally a table with a "header"
+row too, from this function's point of view. Adding `"From Share"` as a
+`redact_fields` entry (for the *select* detection path, intentionally)
+also made it an exact match for THIS function's header-normalization,
+which then treated column 0 across every subsequent row as "data in the
+From Share column" — i.e. grabbed `"To Share:"`, `"Amount:"`, `"Memo:"`'s
+own label cells as if they were per-row sensitive values, and masked
+those cells' bounding boxes instead.
+
+**Fix:** `_find_column_fields` now skips any table whose header row has
+fewer than 3 columns. Verified this cleanly separates the two real
+shapes in this app: the member detail page's genuine grid has 4 columns
+(`Share ID | Type | Balance | Status`); every vertical label:value form
+table (Funds Transfer, Place Account Hold) has exactly 2. Re-ran
+`find_sensitive_fields` directly against both live pages: Funds
+Transfer now returns only `from_share`/`to_share` entries (58 = 29
+options × 2 selects, all correctly positioned over the value column,
+label column untouched); the member detail page's Share ID column
+still returns all 27 rows correctly (unaffected, non-regressing).
+
+**Re-verified with a fresh real discovery run**
+(`evidence/meridian/funds_transfer/discovery_redaction_check/`,
+replacing the broken evidence): screenshot now shows clean label text
+next to two correctly-boxed select values; 117 `[REDACTED]` occurrences
+(matching the count from before the select-detection path existed at
+all, confirming the row-based over-masking artifact — which had
+inflated the prior broken run's count to 133 — is gone).
+
+Also spot-checked, since `place_account_hold`'s own policy adds a
+`"Share"` entry for the same select-detection path: the Hold form is
+also a 2-column table, so it was never at risk of this specific
+mis-fire either way — confirmed directly against the live page (only
+`share` entries returned, correctly positioned; a harmless redundant
+row-based match on the same field, since `inner_text()` on a `<select>`
+returns all option text and the label cell literally reads `"Share:"`,
+masks the same value-column region, not the labels).
+
+**Committed:** pending.
+
+---
+
+## 2026-08-27 — MERIDIAN Place Account Hold capability
+
+**Explored before building, per the task.** Wrote
+`scripts/recon_place_hold.py` (same throwaway, no-LLM style as
+`scripts/recon_meridian.py`) and ran it for real against both `teller1`
+and `super1`. Finding (full transcript + screenshots in
+`evidence/meridian/place_account_hold/exploration/`): this is a HARD
+REJECTION, not an in-context supervisor-override prompt. The hold form
+itself is visible to a non-supervisor (with a static "RESTRICTED
+FUNCTION - SUPERVISOR OVERRIDE REQUIRED" warning banner in its heading,
+but no interactive override control anywhere on the page); clicking
+Continue as `teller1` lands on a dedicated rejection page instead of the
+review screen — "SUPERVISOR OVERRIDE REQUIRED / Operator profile
+teller1 is not authorized to perform this function. A supervisor must
+sign on to complete this request." (HTTP 403), whose only affordance is
+"Return to previous screen." The only way forward is a real sign-off/
+sign-on cycle to a supervisor operator. This directly determined the
+escalation design below — a resolvable in-session privilege gap
+escalates, per the existing design decision, rather than being modeled
+as a business outcome.
+
+**Built the capability.** Discovery (as `super1`, the only path that can
+reach a successful `done` trajectory — `teller1` cannot complete this
+flow at all) against the real Place Account Hold form: sign on, click
+Place Account Hold, search/select member 100234, select `* Share` and
+`* Reason Code`, type `Notes`, Continue to the `CONFIRM ACCOUNT HOLD`
+review screen, Apply Hold, extract the confirmation. Real hold placed
+for real during discovery itself (`CN480444`). Per the task, `Share ID`
+was deliberately omitted from `--redact-fields` for this one discovery
+run only (the model needs to read real share IDs/statuses to choose an
+OPEN share) — `E-mail`/`Phone`/`Address` stayed redacted throughout.
+The compiled policy's own `evidence_policy.redact_fields` keeps `Share
+ID` *and* a new `Share` entry (needed because this form's single select
+label is exactly `"Share"`, not `"From Share"`/`"To Share"`) regardless
+— replay never re-observes the page, so it has none of discovery's
+read-the-page-to-select-a-value tension.
+
+`schema/capabilities/meridian/place_account_hold.policy.json`:
+`risk_class: mutating`, `requires_confirmation: true`; expected_outcomes
+`INVALID_CREDENTIALS` (shared sign-on rejection text) and
+`VALIDATION_ERROR` (real text from `?inject=validation` against the
+hold route — see below); `step_overrides["12"]` (the compiled step_id
+for the "Continue" click that submits the hold form — the actual
+permission-boundary step) set to `retry: 0, then: escalate` on every
+trigger, so a checkpoint failure there — the only way this step can
+fail — always escalates immediately rather than retrying uselessly
+against a wall that a retry can't fix.
+
+**`?inject=` recon against the hold route**
+(`evidence/meridian/place_account_hold/injects/summary.txt`):
+`?inject=permission` (403) is byte-identical (module the operator name)
+to the real, unforced `teller1` rejection — confirmed no separate
+handling is needed, since it exercises the exact same
+checkpoint-failure/step_overrides path. `?inject=validation` (400,
+"TRANSACTION REJECTED" / "The transaction could not be completed as
+entered.") is the same shared host-level rejection text
+`funds_transfer`'s `VALIDATION_ERROR` uses, added as this capability's
+own `VALIDATION_ERROR` outcome. `?inject=maintenance` (503) left
+unmodeled, same reasoning as `funds_transfer`'s (a genuinely recoverable
+condition, not a business outcome, needing engine-level retry timing
+out of scope here). `?inject=notfound` isn't reachable at any step this
+capability actually executes (member selection happens earlier).
+
+**Tested for real, all the way through `agent.replay` (not just
+discovery), via a driver script mirroring
+`.github/scripts/check_escalation_lifecycle.py`'s CDP-attach pattern**
+(`AGENT_CDP_PORT`, a second Playwright process attached to the SAME live
+browser standing in for the human operator, the real
+`agent.operator_console` `/resume/<run_id>` endpoint for every resume):
+
+- **Happy path, `super1`, share `100234-MMKT-28`:** risk-gate pause ->
+  resume -> `status: "success"`, `hold_confirmation: "CN480445"` — a
+  real hold, confirmed live.
+- **`teller1`, share `100234-CERT-27`:** risk-gate pause -> resume ->
+  step 12 executes, checkpoint fails (lands on the rejection page, not
+  the review screen), escalates immediately per `step_overrides`
+  (`sessions.db`: `status=paused`, `current_step_id=12`,
+  `pause_reason=on_checkpoint_failure`, real screenshot saved). The
+  human recovery this time is NOT a same-identity fix like Transfer's
+  dialog-dismiss — it's a real sign-off (`teller1`) / sign-on (`super1`)
+  cycle in the SAME live session, then re-navigating and re-filling the
+  hold form up to the review screen, so step 12's ORIGINAL checkpoint
+  (`Apply Hold` visible) becomes true without the engine ever re-running
+  step 12's own action (per the ACT/SETTLE/CHECK split). Resumed ->
+  the engine's own CHECK-phase retry sees the checkpoint now pass and
+  continues automatically to step 13, where the AUTOMATION (not the
+  human) clicks `Apply Hold` and completes the real POST ->
+  `status: "success"`, `hold_confirmation: "CN480446"`. Full narrative
+  in `evidence/meridian/place_account_hold/escalation/note.txt`.
+
+Curated evidence under `evidence/meridian/place_account_hold/`:
+`exploration/` (the recon transcript + before/after screenshots for
+both operators), `discovery/` (the real successful `super1` trajectory),
+`replays/success/` and `escalation/` (the two `agent.replay` runs above,
+logs + screenshots + result JSON), `injects/summary.txt`.
+
+**One thing user-flagged during review, checked and confirmed NOT a bug:**
+`evidence/meridian/place_account_hold/discovery/screenshots/` showing
+Share ID and Reason Code in plain text is the direct, explicit result
+of the task's own instruction (c): `Share ID` was deliberately omitted
+from `--redact-fields` for that one discovery run only, because the
+model needs to read real share IDs/statuses to select one — the same
+tradeoff already documented for `funds_transfer`'s own original
+discovery evidence (also unredacted for Share ID, same reason).
+Confirmed E-mail/Phone/Address (which stayed in `--redact-fields`
+throughout) never appear anywhere in this trajectory at all (the Place
+Hold flow never visits the member detail page), so there's nothing
+silently leaking beyond the one deliberate, documented exception.
+Separately confirmed the *compiled* policy's `evidence_policy.redact_fields`
+(`Share ID` + `Share`, used at replay time, which never has this
+discovery-time conflict) correctly masks the Hold form's `<select>` when
+exercised directly against the live page — the 3-column guard above
+doesn't regress it (the Hold form is also a 2-column table, so it was
+never at risk of the same mis-fire; there's a harmless redundant
+row-based match on the same field too, since `inner_text()` on a
+`<select>` returns all option text and the label cell literally reads
+`"Share:"`, but it masks the same value-column region, not the labels
+— confirmed visually, no layout defect).
+
+**Committed:** pending.
+
+---
+
+## 2026-08-27 — MERIDIAN Open New Share capability
+
+Lighter build, reusing label_proximity/select/redaction/step_overrides
+machinery already in place — no permission wall for `teller1` (unlike
+Place Account Hold), so this is structurally closer to Funds Transfer.
+
+**Explored first**: `* Share Type` is a 4-option generic type-code
+`<select>` (`S0001 - Regular Shares` / `S0070 - Share Draft (Checking)`
+/ `MMKT - Money Market` / `CERT - Certificate`) shared across every
+member, not a per-member Share ID — checked directly per the task's ask
+("don't assume it won't"), confirmed no redaction/discovery conflict:
+the full standard redact_fields set (including `Share ID`) applied with
+no exclusion needed. Real minimum-deposit rejections captured live and
+found to vary by share type — Regular Shares' minimum is $5.00,
+Certificate's is $500.00 (`"Certificates require a minimum opening
+deposit of $500.00."` vs `"A minimum opening deposit of $5.00 is
+required."`) — both share the substring `"minimum opening deposit"`,
+which `MINIMUM_DEPOSIT_NOT_MET`'s detection matches on rather than
+enumerating a rejection per share type.
+
+**A real, separate redaction gap found here, distinct from the
+`_find_column_fields` bug above**: the post-submit confirmation page's
+label is `"New Share ID:"`, not `"Share ID:"` — a different label
+entirely, so the existing `Share ID` entry never matched it via any
+path. Tracing why revealed the ROW-based path's own match comparison
+had a latent bug: it joined the CELL's normalized label with
+underscores before comparing against `wanted`, but `wanted` itself was
+never joined the same way (kept natural spaced text like `"share id"`)
+— so a multi-word natural-text `redact_fields` entry could never match
+via that path, regardless of what was declared. This had gone
+unnoticed because every prior MERIDIAN-specific entry (`E-mail`,
+`Phone`, `Address`) was a single word, where the bug is invisible.
+Fixed with a shared `normalize_label()` helper (lowercase, collapse
+whitespace AND underscores to one space) used consistently by all
+three detection paths — `account_number`-style pre-joined entries and
+natural spaced entries like `"New Share ID"` now both match either way.
+Re-verified non-regressing against the member detail Share ID column,
+Transfer's From/To Share selects, and Place Account Hold's Share
+select. `open_new_share.policy.json`'s own `evidence_policy.redact_fields`
+adds `New Share ID` alongside the task's literal 5-field baseline — a
+deliberate deviation, flagged: leaving it off would leave a real
+per-member account identifier unredacted on this capability's own
+confirmation screen.
+
+Discovered and replay-tested for real: happy path (`teller1`, Regular
+Shares, $50.00 → `CN480004`/`CN480005` across discovery + replay);
+`MINIMUM_DEPOSIT_NOT_MET` business outcome (Regular Shares, $1.00 →
+`"A minimum opening deposit of $5.00 is required."`); `?inject=validation`
+confirmed real, matches the shared `VALIDATION_ERROR` text.
+`?inject=permission` also returns a `SUPERVISOR OVERRIDE REQUIRED` page
+here, but confirmed live that `teller1` completes the ENTIRE real flow
+(including the actual post) with no natural permission wall anywhere —
+unlike Place Account Hold, this inject doesn't correspond to any real
+restriction for this capability, so no `step_overrides`/escalation
+branch was added for it.
+
+Evidence under `evidence/meridian/open_new_share/`: `discovery/` (with
+its own `summary.txt` covering the two findings above),
+`replays/success/`, `replays/minimum_deposit_not_met/`,
+`injects/summary.txt`.
+
+**Committed:** `b88d305`.
+
+---
+
+## 2026-08-27 — Fix: `type`/`select` tool-call values and pre-filled `<input>`s never actually redacted
+
+Found building MERIDIAN Update Member Information — its E-mail/Phone/
+Mailing Address textboxes are PRE-FILLED with the member's current
+value (unlike every prior form, which only ever showed sensitive data
+as plain `<td>` text or `<select>` options). Verifying that evidence
+surfaced three real, previously-undetected redaction gaps.
+
+**Gap 1 — `<input>`/`<textarea>` values were never read.** The
+row-based path's value extraction used `sibling.inner_text()`, which
+reflects rendered text NODES — empty for an `<input>`, whose current
+text lives in its `value` attribute instead. So a pre-filled sensitive
+field's value silently never matched `find_sensitive_fields` at all,
+even with the correct label declared. Confirmed live: the member detail
+page's plain-text E-mail/Phone/Address cells redact correctly; the
+identical values on the Update form's editable textboxes did not.
+Fixed: falls back to the nested `input`/`textarea`'s `input_value()`
+when `inner_text()` is empty.
+
+**Gap 2 — a newly-typed value was never redacted, project-wide, not
+just here.** `agent/discovery.py` computes `sensitive =
+find_sensitive_fields(page, redact_fields)` from the page's PRE-action
+state, then uses it to mask both the model's free text and the tool
+call's own input — so a value the model is ABOUT to type for the first
+time (never yet visible on the page) has nothing to match against.
+Checked how far this reached: the literal `"password"` typed at every
+single capability's sign-on step has been leaking unmasked into
+`trajectory.json`/`log.jsonl` since the very first `sign_on` capability
+— confirmed present, unredacted, in `funds_transfer`, `place_account_hold`,
+and `open_new_share`'s already-committed discovery evidence (an earlier
+grep that seemed to show it redacted was checking for single-quoted
+Python-repr text against a double-quoted JSON file — a false negative,
+not a real check). Fixed with a new `_mask_typed_value` step: for a
+`type`/`select` tool call, if the target field's own `name` (accessible
+label) matches a `redact_fields` entry, mask `value` regardless of
+whether it was ever previously observed. A `typed_secrets` list,
+accumulated across the whole run, carries each masked raw value forward
+so later steps' free text can also catch it — needed because a `done`
+summary narrating back what it just did (e.g. "updated the e-mail to
+ada.lovelace+...@example.com") is exactly the kind of echo `model_text`
+masking already existed for, just never wired up to values that were
+typed rather than read.
+
+**Gap 3 — a bare `"[REDACTED]"` broke `agent.compiler`'s templatize()
+once more than one field could be masked in one run.**
+`templatize()`'s exact-value match against `--param` silently
+collapsed every field sharing the identical placeholder string onto
+whichever declared param happened to equal it first (dict-iteration
+order) — `password`, `e_mail`, and `phone` all being `"[REDACTED]"`
+meant only one of the three could ever compile; the rest failed with
+"declared param(s) [...] were never templatized". Fixed by tagging the
+placeholder per field (`[REDACTED:password]`, `[REDACTED:e-mail]`,
+`[REDACTED:phone]`) — still unambiguously a placeholder, not real data,
+but now distinguishable. This is a required change to the
+discover → compile workflow going forward: a redacted, templatized
+field's compile-time `--param` must be the matching `[REDACTED:<field>]`
+string, not the real secret (which also means the real secret no longer
+needs to pass through the compile CLI's argv at all — a small,
+unplanned privacy improvement).
+
+All three fixed at the source (`agent/redaction.py`,
+`agent/discovery.py`), each re-verified against a REAL re-run of the
+Update Member Information discovery (iterated several times narrowing
+down the exact leak — see `evidence/meridian/update_member_information/discovery/summary.txt`
+for the full before/after). **Not remediated in this task**: every
+already-committed capability's evidence still carries the raw
+`"password"` string from before Gap 2 existed — flagged as a real,
+low-severity (shared demo credential, not unique PII) follow-up, not
+silently left unmentioned.
+
+**Risk-gate conflict, surfaced and resolved with the user, then
+reverted.** The task originally asked for `risk_class: mutating,
+requires_confirmation: false` on Update Member Information, so its
+writes (format-validated by the host, trivially correctable) would
+skip the pre-action pause Transfer/Hold/Open New Share all get. But
+`agent/engine.py`'s risk gate was `if artifact.risk_class != "read_only"
+or artifact.guardrails.requires_confirmation` — so ANY non-read_only
+capability paused regardless of `requires_confirmation`, by original
+design (CLAUDE.md: risk_class alone was meant to be sufficient,
+`requires_confirmation` an additional/redundant signal, not a
+substitute). Asked the user how to resolve it rather than silently
+picking a side; the user approved changing the gate to key off
+`requires_confirmation` alone, verified safe at the time (every
+existing mutating capability already declared `requires_confirmation:
+true` explicitly, so their behavior was unchanged) — but the user then
+came back and called this a mistake on their end, not an intentional
+architecture change: risk_class alone being sufficient to gate is a
+proven, deliberate safety property from the original take-home and
+shouldn't have been touched. **Reverted**: `agent/engine.py` is back to
+the exact original condition (`git diff agent/engine.py` against the
+pre-task commit is empty); `update_member_information.policy.json`'s
+`requires_confirmation` is `true`, matching every other mutating
+capability, recompiled. All FOUR mutating capabilities
+(`funds_transfer`, `place_account_hold`, `open_new_share`,
+`update_member_information`) were replay-verified fresh under the
+reverted logic — each capturing the real `sessions.db` row BEFORE
+resuming, not assumed from the flag: all four show `status: "paused"`,
+`current_step_id: 0`, `pause_reason: "risk_confirmation_required"`,
+`owner: "human"`, then complete `status: "success"` after resume
+(`CN480007`/`CN480008`/`CN480009`/`"MEMBER INFORMATION UPDATED"`).
+
+**Committed:** pending, together with Update Member Information below.
+
+---
+
+## 2026-08-27 — MERIDIAN Update Member Information capability
+
+`risk_class: mutating`, `requires_confirmation: true` — same pre-action
+risk gate as every other mutating capability (see the risk-gate
+conflict/revert above). Replay-verified: real `sessions.db` row shows
+`status: "paused"`, `current_step_id: 0`, `pause_reason:
+"risk_confirmation_required"` before resume, `status: "success"` after.
+
+**The task's specific question — does the model need to READ the
+current e-mail/phone, or can it overwrite blindly?** Checked live, not
+assumed: it can overwrite blindly. The form pre-fills all three fields
+with current values, but the discovery goal (update E-mail + Phone with
+brand-new literal values from the goal itself, leave Mailing Address
+completely untouched) completed successfully with the FULL standard
+redact_fields set applied and zero exclusions — the model never needed
+to know what the old values were, since setting a field only requires
+knowing the NEW value (from the goal/params, never from observation)
+and leaving a field alone requires no read at all. No structural
+tension like Share ID's, and said so explicitly rather than assuming it
+from the form shape alone.
+
+**No review/confirm step** — unlike Transfer/Hold/Open New Share's
+Continue → Review → Post shape (which the task's own phrasing assumed
+this capability would also have), Save Changes posts directly; built to
+match what the live app actually does.
+
+Two field-specific format-validation outcomes authored as SEPARATE
+outcomes (not one shared `VALIDATION_ERROR`), since the task explicitly
+left this as a judgment call and each real rejection names its specific
+field: `INVALID_EMAIL_FORMAT` (`"E-mail address is not in a valid
+format."`) and `INVALID_PHONE_FORMAT` (`"Phone number is not valid."`),
+both captured from real live submissions, not guessed. Plus the shared
+`VALIDATION_ERROR` (real `?inject=validation` text) and
+`INVALID_CREDENTIALS`.
+
+All four cases replay-tested for real: happy path → `status: "success"`;
+invalid e-mail → `business_outcome`/`INVALID_EMAIL_FORMAT`; invalid
+phone → `business_outcome`/`INVALID_PHONE_FORMAT`; `?inject=validation`
+confirmed directly against the live route, matches the declared
+`VALIDATION_ERROR` text exactly.
+
+Evidence under `evidence/meridian/update_member_information/`:
+`discovery/` (with its own detailed `summary.txt` — the redaction bug
+chain above was found and fixed WHILE producing this capability's
+evidence), `replays/success/`, `replays/invalid_email_format/`,
+`replays/invalid_phone_format/`, `injects/summary.txt`.
+
+**Committed:** pending.

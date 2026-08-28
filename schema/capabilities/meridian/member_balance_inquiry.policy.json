@@ -1,0 +1,68 @@
+{
+  "capability_id": "meridian_member_balance_inquiry",
+  "description": "Sign on to MERIDIAN CORE, search for a member by member number, and read their name and share balance.",
+  "version": 1,
+  "risk_class": "read_only",
+  "expected_outcomes": [
+    {
+      "code": "INVALID_CREDENTIALS",
+      "description": "The operator ID/password/branch combination was rejected by the sign-on form",
+      "detection": {
+        "type": "text_present",
+        "value": "Invalid operator ID or password.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "MEMBER_NOT_FOUND",
+      "description": "No member exists with the given member number",
+      "detection": {
+        "type": "text_present",
+        "value": "No member records matched your search.",
+        "scope": "page"
+      }
+    }
+  ],
+  "guardrails": {
+    "allowlist_routes": [
+      "/signon",
+      "/menu",
+      "/members",
+      "/members/*"
+    ],
+    "allowed_action_types": [
+      "select",
+      "type",
+      "click",
+      "extract"
+    ],
+    "requires_confirmation": false
+  },
+  "evidence_policy": {
+    "screenshot_on": [
+      "checkpoint_failure",
+      "hard_failure"
+    ],
+    "redact_fields": [
+      "password",
+      "E-mail",
+      "Phone",
+      "Address",
+      "Share ID"
+    ]
+  },
+  "escalation_policy": {
+    "default": {
+      "on_checkpoint_failure": {
+        "retry": 2,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": "escalate",
+      "on_step_timeout": {
+        "retry": 1,
+        "then": "escalate"
+      },
+      "on_hard_failure": "escalate"
+    }
+  }
+}

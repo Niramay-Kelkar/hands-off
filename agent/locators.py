@@ -72,6 +72,29 @@ def _css(scope: Page, strategy: LocatorStrategyModel, params: dict[str, str]) ->
     return scope.locator(selector)
 
 
+@LOCATOR_REGISTRY.register("label_proximity")
+def _label_proximity(scope: Page, strategy: LocatorStrategyModel, params: dict[str, str]) -> Locator:
+    label = substitute(get_field(strategy, "label"), params)
+    # A plain `tr:has-text(label)` also matches an outer wrapping row whose
+    # accessible/text content concatenates every field's label (e.g. a whole
+    # sign-on panel row containing both "Operator ID:" and "Password:") --
+    # `.first` on that would pick the ANCESTOR row, whose first descendant
+    # input is always the first field on the form, silently returning the
+    # wrong element for every field but the first. An anchored ^label: regex
+    # on the row's own accessible name rules that ancestor out (its name
+    # starts with the panel's heading text, never with this one field's
+    # label) while still matching a row whose name carries the field's
+    # current dynamic value after the label (e.g. a <select> row rendered
+    # as "Branch: MAIN-001 - Main Office") -- an exact-match on "label:"
+    # alone can't do that, since the row's name changes with the selection.
+    # Only fall back to the old substring scan for a layout where no row
+    # carries a "label:"-prefixed accessible name at all.
+    row = scope.get_by_role("row", name=re.compile(f"^{re.escape(label)}:"))
+    if row.count() == 0:
+        row = scope.locator(f"tr:has-text({label!r})")
+    return row.first.locator("input, select, textarea").first
+
+
 def resolve_locator(
     strategies: list[LocatorStrategyModel], ctx: "RunContext", *, timeout_ms: int = 3000
 ) -> ResolvedLocator:

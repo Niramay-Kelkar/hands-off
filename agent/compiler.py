@@ -34,7 +34,7 @@ from agent.template import templatize
 from agent.trajectory import Trajectory, TrajectoryStep
 
 SCHEMA_VERSION = "1.0"
-ACTIONABLE_TOOLS = {"click", "type", "navigate", "extract"}
+ACTIONABLE_TOOLS = {"click", "type", "select", "navigate", "extract"}
 _MONEY_PATTERN = re.compile(r"^\$[\d,]+\.\d{2}$")
 
 
@@ -89,6 +89,8 @@ def compile_trajectory(
         step_id += 1
 
     steps.append(_build_extract_step(step_id, extract_actions, output_names, params))
+
+    _apply_step_overrides(steps, policy.step_overrides)
 
     outputs = [_build_output(name, trajectory) for name in output_names]
     inputs = [
@@ -152,7 +154,34 @@ def _checkpoint_for(
         if next_action.extract_label:
             element_check = ConditionSpec(type="element_visible", role="cell", name=next_action.extract_label)
         else:
-            element_check = ConditionSpec(type="element_visible", role=role, name=None)
+            # No label-cell/value-cell pair to fall back on (e.g. a standalone
+            # heading, not a labeled data field) -- nulling the name here
+            # would make this an "any element with this role is visible"
+            # check, which is trivially true on almost every page and would
+            # silently defeat the checkpoint's actual job. Unlike a data
+            # value (a member's name/balance, which varies per input and
+            # per run), a landmark like a page heading is stable and safe to
+            # check for directly, the same as any non-extract step's target.
+            name = templatize(inp["name"], params)
+            element_check = ConditionSpec(type="element_visible", role=role, name=name)
+    elif next_action.resolved_via == "label_proximity":
+        # element_visible resolves role+name via a plain accessibility lookup
+        # (agent/checkpoints.py) -- it has no label_proximity-aware fallback,
+        # and adding one there is out of scope for this compiler-side change.
+        # A hostile form's field carries no accessible name at all, so that
+        # lookup can never match. The field's label text, though, is real
+        # visible page text (it's what let label_proximity find the field by
+        # row in the first place) -- check for that instead, which needs
+        # nothing beyond the already-supported text_present checkpoint.
+        name = templatize(inp["name"], params)
+        # A leading "* " on the label is often a CSS ::before required-field
+        # marker (e.g. MERIDIAN's `.req:before { content: "* "; }`) -- part
+        # of the computed ACCESSIBLE name label_proximity's own locator
+        # correctly matched against, but invisible to text_present's plain
+        # innerText scan, which only ever sees the real label text itself.
+        # Stripping it here is a no-op for any label that never had one.
+        visible_name = re.sub(r"^\*\s*", "", name)
+        element_check = ConditionSpec(type="text_present", value=f"{visible_name}:", scope="page")
     else:
         name = templatize(inp["name"], params)
         element_check = ConditionSpec(type="element_visible", role=role, name=name)
@@ -177,6 +206,15 @@ def _locator_for(role: str, name: str) -> LocatorSpec:
             LocatorStrategyModel(kind="text_label", priority=2, label=name),
         ]
     )
+
+
+def _label_proximity_locator_for(name: str) -> LocatorSpec:
+    # No accessibility/text_label fallback here, same reasoning as the "no
+    # css fallback ever synthesized" rule below: discovery only verified
+    # label_proximity resolution for this field (its accessible name is
+    # blank), so accessibility/text_label would just fail identically at
+    # replay -- emitting them would misrepresent what was actually proven.
+    return LocatorSpec(strategies=[LocatorStrategyModel(kind="label_proximity", priority=1, label=name)])
 
 
 def _label_locator_for(label: str) -> LocatorSpec:
@@ -210,17 +248,46 @@ def _build_action_step(step_id: int, action: TrajectoryStep, checkpoint: Conditi
 
     role = inp["role"]
     target_name = templatize(inp["name"], params)
-    locator = _locator_for(role, target_name)
+    locator = (
+        _label_proximity_locator_for(target_name)
+        if action.resolved_via == "label_proximity"
+        else _locator_for(role, target_name)
+    )
 
     if name == "type":
         value = templatize(inp["value"], params)
         action_model = ActionModel(type="type", value=value)
         description = f"Type into role={role!r} name={target_name!r}"
+    elif name == "select":
+        value = templatize(inp["value"], params)
+        action_model = ActionModel(type="select", value=value)
+        description = f"Select {value!r} in role={role!r} name={target_name!r}"
     else:  # click
         action_model = ActionModel(type="click")
         description = f"Click role={role!r} name={target_name!r}"
 
     return Step(step_id=step_id, description=description, action=action_model, locator=locator, checkpoint=checkpoint)
+
+
+def _money_locator_for() -> LocatorSpec:
+    # label_for_value's label-cell/sibling-value convention only covers a
+    # 2-column label:value row (e.g. "Name:" / "Lovelace, Ada") -- it finds
+    # nothing for a value sitting in a column-header table (e.g. a shares
+    # table with "Share ID | Type | Balance | Status" headers, no per-cell
+    # "Balance:" label), so extract_label comes back None there even though
+    # the value is real. Falling through to a literal-value locator in that
+    # case (the old behavior) pins replay to the exact dollar figure seen at
+    # discovery/compile time, which breaks the moment the live balance
+    # changes -- discovered as a real bug in meridian_member_balance_inquiry,
+    # see BUILD_LOG.md. A money-shaped value gets a money-pattern locator
+    # instead: still untied to the literal figure, and .first (in
+    # resolve_locator) reproduces "whichever cell discovery actually read"
+    # since it's the first such cell in DOM order, same as discovery saw.
+    return LocatorSpec(
+        strategies=[
+            LocatorStrategyModel(kind="accessibility", priority=1, role="cell", name_matches=r"^\$[\d,]+\.\d{2}$"),
+        ]
+    )
 
 
 def _build_extract_step(
@@ -231,6 +298,8 @@ def _build_extract_step(
         inp = a.tool_call["input"]
         if a.extract_label:
             locator = _label_locator_for(a.extract_label)
+        elif _MONEY_PATTERN.match(inp["name"]):
+            locator = _money_locator_for()
         else:
             role = inp["role"]
             target_name = templatize(inp["name"], params)
@@ -260,3 +329,18 @@ def _validate_params_used(steps: list[Step], params: dict[str, str]) -> None:
             f"declared param(s) {unused} were never templatized into any compiled step — "
             "check the --param values exactly match a literal value discovery actually used"
         )
+
+
+def _apply_step_overrides(steps: list[Step], step_overrides: dict[int, dict]) -> None:
+    if not step_overrides:
+        return
+    by_id = {s.step_id: s for s in steps}
+    unknown = [step_id for step_id in step_overrides if step_id not in by_id]
+    if unknown:
+        raise CompilationError(
+            f"policy step_overrides references step_id(s) {unknown} not present in the compiled "
+            f"output (valid step_ids: 1-{len(steps)}) — check the policy against this trajectory's "
+            "actual compiled step order, which can shift if the discovery run changes"
+        )
+    for step_id, override in step_overrides.items():
+        by_id[step_id].escalation_override = override

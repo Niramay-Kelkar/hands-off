@@ -1,0 +1,512 @@
+{
+  "schema_version": "1.0",
+  "capability_id": "meridian_member_balance_inquiry",
+  "version": 1,
+  "description": "Sign on to MERIDIAN CORE, search for a member by member number, and read their name and share balance.",
+  "created_at": "2026-08-27T15:54:46.133995Z",
+  "created_by": "agent.compile",
+  "source_run_id": "discover_20260827T063341Z_d148b6",
+  "target": {
+    "app": "meridian_core",
+    "entry_point": "https://web-sample.interface-hiring.com/signon",
+    "surface_type": "web_legacy"
+  },
+  "risk_class": "read_only",
+  "inputs": [
+    {
+      "name": "operator_id",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'operator_id' (from discovery run discover_20260827T063341Z_d148b6)"
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'password' (from discovery run discover_20260827T063341Z_d148b6)"
+    },
+    {
+      "name": "branch",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'branch' (from discovery run discover_20260827T063341Z_d148b6)"
+    },
+    {
+      "name": "member_id",
+      "type": "string",
+      "pattern": null,
+      "required": true,
+      "description": "Parameter 'member_id' (from discovery run discover_20260827T063341Z_d148b6)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "member_name",
+      "type": "string",
+      "description": "Value captured via extract as 'member_name'"
+    },
+    {
+      "name": "balance",
+      "type": "money",
+      "description": "Value captured via extract as 'balance'"
+    }
+  ],
+  "expected_outcomes": [
+    {
+      "code": "INVALID_CREDENTIALS",
+      "description": "The operator ID/password/branch combination was rejected by the sign-on form",
+      "detection": {
+        "type": "text_present",
+        "conditions": null,
+        "value": "Invalid operator ID or password.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "MEMBER_NOT_FOUND",
+      "description": "No member exists with the given member number",
+      "detection": {
+        "type": "text_present",
+        "conditions": null,
+        "value": "No member records matched your search.",
+        "scope": "page"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "step_id": 1,
+      "description": "Select '{{branch}}' in role='combobox' name='Branch'",
+      "action": {
+        "type": "select",
+        "value": "{{branch}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "Branch"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "text_present",
+            "conditions": null,
+            "value": "Operator ID:",
+            "scope": "page"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MEMBER_NOT_FOUND"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 2,
+      "description": "Type into role='textbox' name='Operator ID'",
+      "action": {
+        "type": "type",
+        "value": "{{operator_id}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "Operator ID"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "text_present",
+            "conditions": null,
+            "value": "Password:",
+            "scope": "page"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MEMBER_NOT_FOUND"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 3,
+      "description": "Type into role='textbox' name='Password'",
+      "action": {
+        "type": "type",
+        "value": "{{password}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "Password"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "button",
+            "name": "Sign On"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MEMBER_NOT_FOUND"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 4,
+      "description": "Click role='button' name='Sign On'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "button",
+            "name": "Sign On"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Sign On"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "link",
+            "name": "Member Inquiry"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MEMBER_NOT_FOUND"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 5,
+      "description": "Click role='link' name='Member Inquiry'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "link",
+            "name": "Member Inquiry"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Member Inquiry"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "text_present",
+            "conditions": null,
+            "value": "Value:",
+            "scope": "page"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MEMBER_NOT_FOUND"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 6,
+      "description": "Type into role='textbox' name='Value'",
+      "action": {
+        "type": "type",
+        "value": "{{member_id}}",
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "label_proximity",
+            "priority": 1,
+            "label": "Value"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "button",
+            "name": "Search"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MEMBER_NOT_FOUND"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 7,
+      "description": "Click role='button' name='Search'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "button",
+            "name": "Search"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Search"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "link",
+            "name": "Select"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MEMBER_NOT_FOUND"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 8,
+      "description": "Click role='link' name='Select'",
+      "action": {
+        "type": "click",
+        "value": null,
+        "fields": null
+      },
+      "locator": {
+        "strategies": [
+          {
+            "kind": "accessibility",
+            "priority": 1,
+            "role": "link",
+            "name": "Select"
+          },
+          {
+            "kind": "text_label",
+            "priority": 2,
+            "label": "Select"
+          }
+        ]
+      },
+      "wait": null,
+      "checkpoint": {
+        "type": "any_of",
+        "conditions": [
+          {
+            "type": "element_visible",
+            "conditions": null,
+            "role": "cell",
+            "name": "Name:"
+          },
+          {
+            "type": "outcome_match",
+            "conditions": null,
+            "outcome_codes": [
+              "INVALID_CREDENTIALS",
+              "MEMBER_NOT_FOUND"
+            ]
+          }
+        ]
+      },
+      "escalation_override": null
+    },
+    {
+      "step_id": 9,
+      "description": "Read final outputs",
+      "action": {
+        "type": "extract",
+        "value": null,
+        "fields": [
+          {
+            "output": "member_name",
+            "locator": {
+              "strategies": [
+                {
+                  "kind": "accessibility",
+                  "priority": 1,
+                  "role": "cell",
+                  "name_matches": "^Name:"
+                }
+              ]
+            }
+          },
+          {
+            "output": "balance",
+            "locator": {
+              "strategies": [
+                {
+                  "kind": "accessibility",
+                  "priority": 1,
+                  "role": "cell",
+                  "name_matches": "^\\$[\\d,]+\\.\\d{2}$"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "locator": null,
+      "wait": null,
+      "checkpoint": {
+        "type": "outputs_non_empty",
+        "conditions": null,
+        "fields": [
+          "member_name",
+          "balance"
+        ]
+      },
+      "escalation_override": null
+    }
+  ],
+  "guardrails": {
+    "allowlist_routes": [
+      "/signon",
+      "/menu",
+      "/members",
+      "/members/*"
+    ],
+    "allowed_action_types": [
+      "select",
+      "type",
+      "click",
+      "extract"
+    ],
+    "requires_confirmation": false
+  },
+  "evidence_policy": {
+    "screenshot_on": [
+      "checkpoint_failure",
+      "hard_failure"
+    ],
+    "redact_fields": [
+      "password",
+      "E-mail",
+      "Phone",
+      "Address",
+      "Share ID"
+    ]
+  },
+  "escalation_policy": {
+    "default": {
+      "on_checkpoint_failure": {
+        "retry": 2,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_step_timeout": {
+        "retry": 1,
+        "then": "escalate"
+      },
+      "on_hard_failure": {
+        "retry": 0,
+        "then": "escalate"
+      }
+    }
+  }
+}

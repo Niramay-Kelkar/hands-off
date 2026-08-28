@@ -1,0 +1,54 @@
+Real, end-to-end escalation test for meridian_place_account_hold,
+run via a driver script mirroring
+.github/scripts/check_escalation_lifecycle.py's CDP-attach pattern
+(agent.replay --headless with AGENT_CDP_PORT set; a second Playwright
+process attaches to the SAME live browser to play the human operator's
+part; the real agent.operator_console /resume/<run_id> endpoint is used
+for both resumes, unmodified).
+
+Input: operator_id=teller1, member_id=100234, share=100234-CERT-27.
+
+1. Risk-gate pause (owner=human, pause_reason=risk_confirmation_required,
+   step=0) -- resumed immediately, as with any mutating capability.
+
+2. Step 12 (the "Continue" click on the hold form) executes: the ACT
+   phase succeeds (the click really happens), but the CHECK phase's
+   checkpoint -- element_visible(button "Apply Hold") OR
+   outcome_match(INVALID_CREDENTIALS, VALIDATION_ERROR) -- fails,
+   because teller1 lands on the "SUPERVISOR OVERRIDE REQUIRED"
+   rejection page instead. Because step 12 carries this capability's
+   step_overrides (retry: 0, then: escalate, on every trigger), the
+   engine escalates immediately rather than retrying. Confirmed in
+   sessions.db: status=paused, current_step_id=12,
+   pause_reason=on_checkpoint_failure, with a real screenshot
+   (screenshots/step_12_on_checkpoint_failure.png) showing the exact
+   rejection text captured live in exploration/recon_output.txt.
+
+3. Real human recovery, in the SAME live browser session (not a fresh
+   one -- same CDP-attached page, same cookies/session): clicked
+   "Return to previous screen", signed off teller1, signed on as
+   super1, re-navigated Place Account Hold -> searched/selected member
+   100234 -> re-filled the hold form (same share/reason/notes) -> Continue.
+   This lands on the real CONFIRM ACCOUNT HOLD review screen, i.e. it
+   makes step 12's ORIGINAL checkpoint condition (Apply Hold visible)
+   true, without the engine having re-run step 12's action itself --
+   the human account for the actual retry of the submission, exactly
+   once, by hand.
+
+4. POSTed /resume/<run_id>. The engine's CHECK-phase retry re-evaluates
+   the SAME checkpoint (never re-invokes step 12's action, per the
+   ACT/SETTLE/CHECK split -- see CLAUDE.md's Safety section), finds
+   "Apply Hold" now visible, step 12 completes, and execution continues
+   automatically to step 13 (click "Apply Hold") -- the automation
+   itself performs the actual mutating POST, not the human. Result:
+   status=success, hold_confirmation=CN480446 (a real hold, confirmed
+   live on MERIDIAN CORE).
+
+This is the answer to why Place Hold's handoff differs from Funds
+Transfer's: Transfer's escalation trigger (an unrecognized dialog) is
+fixed by the human WITHOUT changing who's signed on -- dismiss the
+dialog, resume, the automation's own next click continues normally.
+Place Hold's trigger is a genuine privilege wall baked into the signed-
+on identity itself, so the human's recovery necessarily includes a
+sign-off/sign-on cycle inside the SAME session before the automation
+can complete the very same in-flight capability run.

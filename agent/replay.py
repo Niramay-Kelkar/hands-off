@@ -103,11 +103,22 @@ def _run_stability(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Replay a capability artifact against its live target.")
-    parser.add_argument("--capability", required=True, help="path to a capability artifact JSON file")
+    parser.add_argument("--capability", help="path to a capability artifact JSON file")
     parser.add_argument(
         "--input", action="append", default=[], type=_parse_input, dest="inputs", help="key=value, repeatable"
     )
     parser.add_argument("--headless", action="store_true", help="run the browser headless instead of headed")
+    parser.add_argument(
+        "--supervisor-resume",
+        metavar="RUN_ID",
+        help=(
+            "take over a run that reactively escalated (supervisor-only permission wall) and is "
+            "parked in evidence/sessions/sessions.db: attach to its live browser over CDP and replay "
+            "the capability to completion with the supervisor credentials passed via --input "
+            "(supervisor_id/password/branch, plus any hold-context field the original attempt's "
+            "stashed context can't supply). --capability is ignored in this mode."
+        ),
+    )
     parser.add_argument(
         "--repeat",
         type=int,
@@ -128,8 +139,32 @@ def main(argv: list[str] | None = None) -> int:
         print("--repeat must be >= 1", file=sys.stderr)
         return 2
 
-    artifact = Capability.load(args.capability)
     params = dict(args.inputs)
+
+    if args.supervisor_resume:
+        from agent.capability_api import SupervisorTakeoverError, supervisor_takeover
+
+        creds = {
+            "operator_id": params.pop("supervisor_id", None) or params.pop("operator_id", ""),
+            "password": params.pop("password", ""),
+            "branch": params.pop("branch", ""),
+        }
+        if not all(creds.values()):
+            print("--supervisor-resume needs --input supervisor_id=, password=, branch=", file=sys.stderr)
+            return 2
+        try:
+            outputs = supervisor_takeover(args.supervisor_resume, creds, params or None)
+        except SupervisorTakeoverError as exc:
+            print(f"supervisor takeover failed: {exc}", file=sys.stderr)
+            return 1
+        print(json.dumps({"status": "success", "outputs": outputs}, indent=2, default=str))
+        return 0
+
+    if not args.capability:
+        print("--capability is required (unless --supervisor-resume)", file=sys.stderr)
+        return 2
+
+    artifact = Capability.load(args.capability)
 
     try:
         if args.repeat == 1 and not args.update_confidence:

@@ -1,0 +1,87 @@
+{
+  "capability_id": "meridian_update_member_information",
+  "description": "Sign on to MERIDIAN CORE, update a member's e-mail, phone, and/or mailing address, and save for real.",
+  "version": 1,
+  "risk_class": "mutating",
+  "expected_outcomes": [
+    {
+      "code": "INVALID_CREDENTIALS",
+      "description": "The operator ID/password/branch combination was rejected by the sign-on form",
+      "detection": {
+        "type": "text_present",
+        "value": "Invalid operator ID or password.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "INVALID_EMAIL_FORMAT",
+      "description": "The submitted e-mail address failed the host's format validation -- real text captured from a live invalid-email submission",
+      "detection": {
+        "type": "text_present",
+        "value": "E-mail address is not in a valid format.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "INVALID_PHONE_FORMAT",
+      "description": "The submitted phone number failed the host's format validation -- real text captured from a live invalid-phone submission",
+      "detection": {
+        "type": "text_present",
+        "value": "Phone number is not valid.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "description": "The host rejected the request as malformed/invalid input -- real text captured from ?inject=validation's actual response against the update route",
+      "detection": {
+        "type": "text_present",
+        "value": "The transaction could not be completed as entered.",
+        "scope": "page"
+      }
+    }
+  ],
+  "guardrails": {
+    "allowlist_routes": [
+      "/signon",
+      "/menu",
+      "/members",
+      "/members/*"
+    ],
+    "allowed_action_types": [
+      "select",
+      "type",
+      "click",
+      "extract"
+    ],
+    "requires_confirmation": true
+  },
+  "evidence_policy": {
+    "screenshot_on": [
+      "checkpoint_failure",
+      "hard_failure"
+    ],
+    "redact_fields": [
+      "password",
+      "E-mail",
+      "Phone",
+      "Address",
+      "Mailing Address",
+      "Share ID"
+    ]
+  },
+  "escalation_policy": {
+    "default": {
+      "on_checkpoint_failure": {
+        "retry": 2,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": "escalate",
+      "on_step_timeout": {
+        "retry": 1,
+        "then": "escalate"
+      },
+      "on_hard_failure": "escalate"
+    }
+  }
+}

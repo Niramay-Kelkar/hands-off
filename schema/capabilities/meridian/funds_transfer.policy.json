@@ -1,0 +1,108 @@
+{
+  "capability_id": "meridian_funds_transfer",
+  "description": "Sign on to MERIDIAN CORE, transfer funds between two shares for a member, and post the transaction for real.",
+  "version": 1,
+  "risk_class": "mutating",
+  "expected_outcomes": [
+    {
+      "code": "INVALID_CREDENTIALS",
+      "description": "The operator ID/password/branch combination was rejected by the sign-on form",
+      "detection": {
+        "type": "text_present",
+        "value": "Invalid operator ID or password.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "INSUFFICIENT_FUNDS",
+      "description": "The requested amount exceeds the source share's available balance",
+      "detection": {
+        "type": "text_present",
+        "value": "Insufficient available balance in the source share.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "SHARE_ON_HOLD",
+      "description": "The source share is on HOLD and cannot be debited -- detected from the post-attempt server response, not the member record page's OPEN/HOLD status badge, which does not reliably predict debit eligibility",
+      "detection": {
+        "type": "text_present",
+        "value": "Source share is HOLD and cannot be debited.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "description": "The host rejected the transfer as malformed/invalid input -- real text captured from ?inject=validation's actual response, a distinct rendering path from the INSUFFICIENT_FUNDS/SHARE_ON_HOLD 'could not be validated:' review-step rejections",
+      "detection": {
+        "type": "text_present",
+        "value": "The transaction could not be completed as entered.",
+        "scope": "page"
+      }
+    }
+  ],
+  "guardrails": {
+    "allowlist_routes": [
+      "/signon",
+      "/menu",
+      "/members",
+      "/members/*"
+    ],
+    "allowed_action_types": [
+      "select",
+      "type",
+      "click",
+      "extract"
+    ],
+    "requires_confirmation": true
+  },
+  "evidence_policy": {
+    "screenshot_on": [
+      "checkpoint_failure",
+      "hard_failure"
+    ],
+    "redact_fields": [
+      "password",
+      "E-mail",
+      "Phone",
+      "Address",
+      "Share ID",
+      "From Share",
+      "To Share"
+    ]
+  },
+  "escalation_policy": {
+    "default": {
+      "on_checkpoint_failure": {
+        "retry": 2,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": "escalate",
+      "on_step_timeout": {
+        "retry": 1,
+        "then": "escalate"
+      },
+      "on_hard_failure": "escalate"
+    }
+  },
+  "step_overrides": {
+    "15": {
+      "on_checkpoint_failure": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_step_timeout": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_hard_failure": {
+        "retry": 0,
+        "then": "escalate"
+      }
+    }
+  }
+}

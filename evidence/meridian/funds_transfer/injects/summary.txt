@@ -1,0 +1,19 @@
+=== inject=validation ===
+URL: https://web-sample.interface-hiring.com/members/100234/transfer?inject=validation
+HTTP status: 400
+TRANSACTION REJECTED
+The transaction could not be completed as entered. Please review the field values and resubmit.
+
+=== inject=maintenance ===
+URL: https://web-sample.interface-hiring.com/members/100234/transfer?inject=maintenance
+HTTP status: 503
+SCHEDULED MAINTENANCE IN PROGRESS
+The host is temporarily unavailable while nightly batch posting completes.
+This window normally clears within a few moments.
+
+Also observed live and unprompted (no ?inject= param at all) during this
+task's own testing: the same "SCHEDULED MAINTENANCE IN PROGRESS" page,
+appearing organically and clearing on its own ~15-30s later. This is a
+real, periodic condition of the sandbox, not just a test-only hook --
+strengthens the case that it is genuinely a "recoverable condition" per
+the outcome taxonomy, not something to special-case as a business outcome.

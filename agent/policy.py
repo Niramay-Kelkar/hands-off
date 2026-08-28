@@ -19,7 +19,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from agent.models import EscalationPolicy, EvidencePolicy, ExpectedOutcome, Guardrails
+from agent.models import EscalationPolicy, EscalationRule, EvidencePolicy, ExpectedOutcome, Guardrails
 
 
 class PolicySpec(BaseModel):
@@ -33,6 +33,13 @@ class PolicySpec(BaseModel):
     guardrails: Guardrails
     evidence_policy: EvidencePolicy
     escalation_policy: EscalationPolicy
+    # Keyed by the compiled Step.step_id it applies to (1-based, in final
+    # compiled order) -- the only stable identifier a policy author can
+    # reference, since discovery trajectory steps carry no identifier of
+    # their own. compile_trajectory fails loudly (CompilationError) if a
+    # key here doesn't match any compiled step_id, the same as
+    # _validate_params_used does for an unused --param.
+    step_overrides: dict[int, dict[str, EscalationRule]] = {}
 
     @classmethod
     def load(cls, path: str | Path) -> "PolicySpec":

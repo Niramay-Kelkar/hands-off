@@ -82,7 +82,9 @@ def validate_inputs(artifact: Capability, raw_params: dict[str, str]) -> dict[st
     return result
 
 
-def run_capability(artifact: Capability, raw_params: dict[str, str], *, headed: bool = True) -> ReplayResult:
+def run_capability(
+    artifact: Capability, raw_params: dict[str, str], *, headed: bool = True, inject: str | None = None
+) -> ReplayResult:
     params = validate_inputs(artifact, raw_params)
 
     run_id = evidence.new_run_id(artifact.capability_id)
@@ -111,7 +113,8 @@ def run_capability(artifact: Capability, raw_params: dict[str, str], *, headed: 
 
         try:
             try:
-                page.goto(artifact.target.entry_point)
+                entry_url = f"{artifact.target.entry_point}?inject={inject}" if inject else artifact.target.entry_point
+                page.goto(entry_url)
                 guardrails.check_route(page.url, ctx.allowed_origin, artifact.guardrails.allowlist_routes)
             except Exception as exc:
                 log.event("entry_navigation_failed", detail=str(exc)[:300])

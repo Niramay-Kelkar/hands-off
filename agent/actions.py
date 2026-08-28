@@ -1,9 +1,10 @@
 """ACTION_REGISTRY: one function per step action type.
 
-`type` and `click` act on the step-level ResolvedLocator the engine
-already resolved. `navigate` ignores it and calls page.goto(). `extract`
-ignores it too (its step has no top-level `locator` — each output field
-carries its own strategy list) and resolves each field's locator itself.
+`type`, `click`, and `select` act on the step-level ResolvedLocator the
+engine already resolved. `navigate` ignores it and calls page.goto().
+`extract` ignores it too (its step has no top-level `locator` — each
+output field carries its own strategy list) and resolves each field's
+locator itself.
 """
 
 from __future__ import annotations
@@ -37,6 +38,58 @@ def _click(action: ActionModel, resolved: ResolvedLocator | None, ctx: "RunConte
         raise ValueError("click action requires a step-level locator")
     resolved.locator.click()
     ctx.log.event("action", type="click")
+
+
+@ACTION_REGISTRY.register("select")
+def _select(action: ActionModel, resolved: ResolvedLocator | None, ctx: "RunContext") -> None:
+    if resolved is None:
+        raise ValueError("select action requires a step-level locator")
+    value = substitute(action.value or "", ctx.params)
+
+    # Exact visible-label match first (the discovered/compiled contract).
+    try:
+        resolved.locator.select_option(label=value, timeout=2000)
+        ctx.log.event("action", type="select", value=value, match="exact_label")
+        return
+    except Exception:
+        pass
+
+    # Fall back to a partial match against the live <option> list, so a
+    # capability whose input is a bare identifier (e.g. share "100234-MMKT-15")
+    # still resolves against an option whose visible label carries extra
+    # descriptive text ("100234-MMKT-15 - Money Market - OPEN").
+    option_els = resolved.locator.locator("option")
+    labels = [t.strip() for t in option_els.all_text_contents()]
+    values = option_els.evaluate_all("els => els.map(e => e.value)")
+    needle = value.strip().lower()
+
+    def _rank(candidate: str) -> int:
+        c = candidate.strip().lower()
+        if not c:
+            return 0
+        if c == needle:
+            return 3
+        if c.startswith(needle):
+            return 2
+        if needle in c:
+            return 1
+        return 0
+
+    best_idx, best_rank = -1, 0
+    for idx, (lbl, val) in enumerate(zip(labels, values)):
+        rank = max(_rank(lbl), _rank(val))
+        if rank > best_rank:
+            best_idx, best_rank = idx, rank
+
+    if best_idx < 0:
+        raise ValueError(
+            f"select: no option exactly or partially matching {value!r}; options were {labels!r}"
+        )
+
+    resolved.locator.select_option(index=best_idx)
+    ctx.log.event(
+        "action", type="select", value=value, match="partial", resolved_option=labels[best_idx]
+    )
 
 
 @ACTION_REGISTRY.register("navigate")

@@ -1,0 +1,89 @@
+{
+  "capability_id": "meridian_place_account_hold",
+  "description": "Sign on to MERIDIAN CORE, place a hold on a member's share for a stated reason, and post it for real. Requires supervisor-level operator credentials -- a non-supervisor sign-on hits a hard permission rejection at the post step, which must escalate to a human rather than be reported as a business outcome, since the gap is resolvable in-session by a supervisor signing on.",
+  "version": 1,
+  "risk_class": "mutating",
+  "expected_outcomes": [
+    {
+      "code": "INVALID_CREDENTIALS",
+      "description": "The operator ID/password/branch combination was rejected by the sign-on form",
+      "detection": {
+        "type": "text_present",
+        "value": "Invalid operator ID or password.",
+        "scope": "page"
+      }
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "description": "The host rejected the hold request as malformed/invalid input -- real text captured from ?inject=validation's actual response against the hold route",
+      "detection": {
+        "type": "text_present",
+        "value": "The transaction could not be completed as entered.",
+        "scope": "page"
+      }
+    }
+  ],
+  "guardrails": {
+    "allowlist_routes": [
+      "/signon",
+      "/menu",
+      "/members",
+      "/members/*"
+    ],
+    "allowed_action_types": [
+      "select",
+      "type",
+      "click",
+      "extract"
+    ],
+    "requires_confirmation": true
+  },
+  "evidence_policy": {
+    "screenshot_on": [
+      "checkpoint_failure",
+      "hard_failure"
+    ],
+    "redact_fields": [
+      "password",
+      "E-mail",
+      "Phone",
+      "Address",
+      "Share ID",
+      "Share"
+    ]
+  },
+  "escalation_policy": {
+    "default": {
+      "on_checkpoint_failure": {
+        "retry": 2,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": "escalate",
+      "on_step_timeout": {
+        "retry": 1,
+        "then": "escalate"
+      },
+      "on_hard_failure": "escalate"
+    }
+  },
+  "step_overrides": {
+    "12": {
+      "on_checkpoint_failure": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_unrecognized_dialog": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_step_timeout": {
+        "retry": 0,
+        "then": "escalate"
+      },
+      "on_hard_failure": {
+        "retry": 0,
+        "then": "escalate"
+      }
+    }
+  }
+}

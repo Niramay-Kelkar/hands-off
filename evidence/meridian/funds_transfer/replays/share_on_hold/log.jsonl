@@ -1,0 +1,46 @@
+{"ts": "2026-08-27T08:21:48.309517+00:00", "kind": "run_start", "capability_id": "meridian_funds_transfer", "version": 1, "params": {"operator_id": "teller1", "password": "[REDACTED]", "branch": "MAIN-001 - Main Office", "member_id": "100234", "from_share": "100234-S0001 - Regular Shares ($1,500.00)", "to_share": "100234-MMKT-15 - Money Market ($6.00)", "amount": "1.00", "memo": "hold share recompiled test"}}
+{"ts": "2026-08-27T08:21:49.966451+00:00", "kind": "risk_gate_pause", "risk_class": "mutating", "requires_confirmation": true, "screenshot": "evidence/runs/meridian_funds_transfer_20260827T082148Z_2e8f86/screenshots/step_0_risk_confirmation_required.png"}
+{"ts": "2026-08-27T08:21:51.022504+00:00", "kind": "risk_gate_resumed"}
+{"ts": "2026-08-27T08:21:51.091961+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:21:51.150398+00:00", "kind": "action", "type": "select", "value": "MAIN-001 - Main Office"}
+{"ts": "2026-08-27T08:21:52.286519+00:00", "kind": "checkpoint", "step_id": 1, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:21:52.348827+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:21:52.460347+00:00", "kind": "action", "type": "type", "value": "teller1"}
+{"ts": "2026-08-27T08:21:53.511459+00:00", "kind": "checkpoint", "step_id": 2, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:21:53.581360+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:21:53.706785+00:00", "kind": "action", "type": "type", "value": "password"}
+{"ts": "2026-08-27T08:21:54.759083+00:00", "kind": "checkpoint", "step_id": 3, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:21:54.813028+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:21:54.997153+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T08:21:56.087267+00:00", "kind": "checkpoint", "step_id": 4, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:21:56.162166+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:21:56.271265+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T08:21:57.318026+00:00", "kind": "checkpoint", "step_id": 5, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:21:57.376747+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:21:57.416304+00:00", "kind": "action", "type": "type", "value": "100234"}
+{"ts": "2026-08-27T08:21:58.465296+00:00", "kind": "checkpoint", "step_id": 6, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:21:58.502845+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:21:58.669394+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T08:21:59.756050+00:00", "kind": "checkpoint", "step_id": 7, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:21:59.819496+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:22:00.492245+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T08:22:01.977001+00:00", "kind": "checkpoint", "step_id": 8, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:22:02.407570+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:22:02.554879+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T08:22:03.615546+00:00", "kind": "checkpoint", "step_id": 9, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:22:03.690208+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:22:03.820882+00:00", "kind": "action", "type": "select", "value": "100234-S0001 - Regular Shares ($1,500.00)"}
+{"ts": "2026-08-27T08:22:04.883677+00:00", "kind": "checkpoint", "step_id": 10, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:22:04.940102+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:22:05.005742+00:00", "kind": "action", "type": "select", "value": "100234-MMKT-15 - Money Market ($6.00)"}
+{"ts": "2026-08-27T08:22:06.051975+00:00", "kind": "checkpoint", "step_id": 11, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:22:06.107581+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:22:06.166887+00:00", "kind": "action", "type": "type", "value": "1.00"}
+{"ts": "2026-08-27T08:22:07.221661+00:00", "kind": "checkpoint", "step_id": 12, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:22:07.282065+00:00", "kind": "locator_resolved", "strategy_kind": "label_proximity", "priority": 1, "attempts": [{"kind": "label_proximity", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:22:07.338456+00:00", "kind": "action", "type": "type", "value": "hold share recompiled test"}
+{"ts": "2026-08-27T08:22:08.398098+00:00", "kind": "checkpoint", "step_id": 13, "matched": true, "outcome_code": null, "detail": null}
+{"ts": "2026-08-27T08:22:08.450843+00:00", "kind": "locator_resolved", "strategy_kind": "accessibility", "priority": 1, "attempts": [{"kind": "accessibility", "priority": 1, "success": true}]}
+{"ts": "2026-08-27T08:22:08.566118+00:00", "kind": "action", "type": "click"}
+{"ts": "2026-08-27T08:22:11.616735+00:00", "kind": "checkpoint", "step_id": 14, "matched": true, "outcome_code": "SHARE_ON_HOLD", "detail": null}
+{"ts": "2026-08-27T08:22:11.640218+00:00", "kind": "run_end", "status": "business_outcome"}

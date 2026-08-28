@@ -1,0 +1,60 @@
+?inject= exploration against the Open New Share route, real requests
+against https://web-sample.interface-hiring.com, signed on as teller1.
+
+--- ?inject=validation ---
+GET /members/100234/open-share?inject=validation -> HTTP 400
+
+  TRANSACTION REJECTED
+
+  The transaction could not be completed as entered. Please review the
+  field values and resubmit.
+
+Same shared host-level rejection text as funds_transfer and
+place_account_hold's own VALIDATION_ERROR outcome. Added as this
+capability's own VALIDATION_ERROR outcome, same detection text.
+
+--- ?inject=permission ---
+GET /members/100234/open-share?inject=permission -> HTTP 403,
+"SUPERVISOR OVERRIDE REQUIRED / Operator profile teller1 is not
+authorized..." -- same page shape as place_account_hold's real
+rejection, but NOT modeled here: confirmed live that teller1 can
+complete the entire real Open New Share flow end to end (reached
+CONFIRM NEW SHARE and clicked "Open Share" for real, see
+discovery/trajectory.json) with no natural permission wall anywhere in
+the flow. Unlike Place Account Hold, this inject does not correspond to
+any real, naturally-occurring restriction for this capability -- it's a
+purely synthetic 403 this route happens to also support -- so no
+step_overrides/escalation branch was added for it.
+
+--- ?inject=maintenance / ?inject=notfound ---
+Same shape/text as every other MERIDIAN route's maintenance/notfound
+injects (recoverable-condition and not-reachable-at-this-step,
+respectively) -- not modeled, same reasoning as documented for
+funds_transfer and place_account_hold.
+
+--- Real, non-injected minimum-deposit rejection ---
+Two real minimum-deposit rejections captured live (not the ?inject=
+mechanism -- this is the app's own natural business-rule validation):
+
+  GET .../open-share, Share Type = Regular Shares, Initial Deposit = $1.00
+  -> POST .../open-share/review ->
+
+    OPEN NEW SHARE
+    The request could not be validated:
+    A minimum opening deposit of $5.00 is required.
+
+  GET .../open-share, Share Type = Certificate, Initial Deposit = $50.00
+  -> POST .../open-share/review ->
+
+    OPEN NEW SHARE
+    The request could not be validated:
+    Certificates require a minimum opening deposit of $500.00.
+
+Different share types enforce different minimums (at least Certificate
+does; Regular Shares' minimum is $5.00). Both messages share the
+substring "minimum opening deposit", which is what MINIMUM_DEPOSIT_NOT_MET's
+detection matches on -- deliberately not enumerating a separate outcome
+per share type, since the task asked for the general "below whatever
+minimum is enforced" case, not a full per-type minimum-deposit matrix.
+Replay-tested for real against the $1.00/Regular Shares case; see
+../replays/minimum_deposit_not_met/.
