@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 import sys
 import threading
 import time
@@ -31,15 +32,32 @@ from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request
+from playwright.sync_api import TimeoutError as PWTimeoutError
+from playwright.sync_api import sync_playwright
 
 load_dotenv()
 
-from agent import escalation
+from agent import escalation, guardrails
+from agent.actions import ACTION_REGISTRY
 from agent.approval import is_approved
-from agent.engine import InputValidationError, run_capability
+from agent.checkpoints import evaluate_checkpoint
+from agent.context import RunContext
+from agent.engine import InputValidationError, run_capability, validate_inputs
+from agent.evidence import StepLogWriter
+from agent.locators import resolve_locator
 from agent.models import Capability
 
 CAPABILITIES_DIR = Path("schema/capabilities")
+
+# Expose every invoke's browser over CDP on a fixed port so the supervisor
+# takeover path (below) can attach to the SAME live browser a paused run
+# left open, rather than starting a fresh session. run_capability() reads
+# this env var itself (see agent/engine.py); setting it here, before any
+# run launches, is all that's needed. Demo-scale: one fixed port means one
+# concurrent browser run — acceptable, same "no scaling infra" cut as the
+# rest of this module.
+CDP_PORT = os.environ.get("AGENT_CDP_PORT", "9333")
+os.environ["AGENT_CDP_PORT"] = CDP_PORT
 OPERATOR_CONSOLE_URL = os.environ.get("OPERATOR_CONSOLE_URL", "http://127.0.0.1:8100")
 SELF_URL = os.environ.get("CAPABILITY_API_URL", "http://127.0.0.1:8200")
 CHAT_MODEL = os.environ.get("CHAT_MODEL", "claude-sonnet-5")
@@ -93,6 +111,16 @@ def _scan_capabilities() -> dict[str, Capability]:
             continue
         catalog[cap.capability_id] = cap
     return catalog
+
+
+def _capability_path(capability_id: str) -> Path | None:
+    for path in sorted(CAPABILITIES_DIR.glob("*.json")) + sorted(CAPABILITIES_DIR.glob("*/*.json")):
+        try:
+            if Capability.load(path).capability_id == capability_id:
+                return path
+        except Exception:
+            continue
+    return None
 
 
 @app.route("/capabilities")
@@ -187,6 +215,13 @@ def invoke_capability(capability_id: str):
 _chat_sessions: dict[str, dict] = {}
 _chat_client: anthropic.Anthropic | None = None
 
+# run_id -> {"capability_id", "params"} for runs that paused on a reactive
+# escalation (a supervisor-only permission wall). The supervisor takeover
+# endpoint reads this to recover the member/share/reason context of the
+# original attempt without having to re-collect it — the teller creds in it
+# are swapped for the supervisor's before replay.
+_reactive_context: dict[str, dict] = {}
+
 _CHAT_SYSTEM = """You are a support assistant for bank back-office operators. You can \
 complete real operations by calling the capability tools provided. Rules:
 
@@ -196,8 +231,10 @@ missing, ask the user for it in plain language — never invent values.
 run. When a tool result says PAUSED_FOR_CONFIRMATION, stop calling tools and ask the \
 user to confirm, in plain language, summarising exactly what will happen.
 - When a tool result says NEEDS_SUPERVISOR, tell the user plainly that the operation \
-was rejected and that a supervisor must take over via the operator console. Do not \
-claim it succeeded and do not try again.
+was rejected because the signed-on operator lacks the privilege, and that a supervisor \
+must take over the SAME paused session. Quote the supervisor-resume instruction from \
+the tool result verbatim (the exact URL to POST supervisor credentials to). Do not \
+claim it succeeded and do not try again yourself.
 - When a tool returns results, report them to the user clearly and concisely."""
 
 _AFFIRMATIVE = {"yes", "y", "yeah", "yep", "confirm", "confirmed", "proceed", "do it", "go ahead", "approve", "approved", "ok", "okay"}
@@ -338,24 +375,31 @@ def _classify_pause(capability_id, params, thread, holder, row) -> dict:
                 "Ask the user to confirm they want to proceed."
             ),
         }
-    # reactive escalation — a runtime rejection a supervisor must handle
+    # reactive escalation — a runtime rejection a supervisor must handle.
+    # Stash the original attempt's context so a supervisor takeover can
+    # replay it against the same live browser with elevated credentials.
+    _reactive_context[run_id] = {"capability_id": capability_id, "params": dict(params or {})}
+    step_id = row["current_step_id"]
     return {
         "kind": "reactive",
         "run_id": run_id,
         "text": (
-            f"NEEDS_SUPERVISOR: '{capability_id}' paused mid-run (reason: {reason}) and cannot be "
-            "resumed by this assistant. A supervisor must take over the live session via the "
-            f"operator console ({OPERATOR_CONSOLE_URL}/?run_id={run_id})."
+            f"NEEDS_SUPERVISOR: '{capability_id}' paused mid-run at step {step_id} (reason: {reason}) "
+            "because the signed-on operator lacks the privilege to post it. This assistant cannot "
+            "resume it. A supervisor must take over the SAME paused session, either by POSTing "
+            "supervisor credentials as JSON {\"supervisor_id\": ..., \"password\": ..., \"branch\": ...} to "
+            f"{SELF_URL}/api/runs/{run_id}/supervisor-resume , or via the operator console "
+            f"({OPERATOR_CONSOLE_URL}/?run_id={run_id})."
         ),
     }
 
 
-def _await_after_resume(capability_id: str, thread, holder, run_id: str) -> dict:
+def _await_after_resume(capability_id: str, thread, holder, run_id: str, params: dict | None = None) -> dict:
     while thread.is_alive():
         time.sleep(1.0)
         row = escalation.get_run(run_id)
         if row is not None and row["status"] == "paused":
-            return _classify_pause(capability_id, {}, thread, holder, row)
+            return _classify_pause(capability_id, params or {}, thread, holder, row)
     thread.join()
     return {
         "kind": "done",
@@ -423,7 +467,8 @@ def chat():
             session["history"].append({"role": "user", "content": message})
             _resume_via_operator_console(pending["run_id"])
             outcome = _await_after_resume(
-                pending["capability_id"], pending["thread"], pending["holder"], pending["run_id"]
+                pending["capability_id"], pending["thread"], pending["holder"], pending["run_id"],
+                pending.get("params"),
             )
             if outcome["kind"] == "confirm":  # unlikely: a second risk gate
                 session["pending"] = outcome
@@ -460,6 +505,213 @@ def chat():
     session["history"].append({"role": "user", "content": message})
     reply = _model_turn(session, tools)
     return jsonify({"reply": reply})
+
+
+# ---------------------------------------------------------------------------
+# Supervisor takeover — completing a reactively-escalated run.
+#
+# When a teller-privileged run hits the supervisor-only permission wall
+# (place_account_hold: no "Apply Hold" control on the review page), the
+# engine escalates and parks the run, browser still open. A supervisor
+# then POSTs their credentials here. This path ATTACHES to that same live
+# browser over CDP and replays the capability's steps to completion with
+# elevated credentials — no fresh session, no engine.py involvement, just
+# agent.actions / agent.locators / agent.checkpoints driven directly.
+#
+# The parked engine loop is never handed back (its owner is left as
+# 'supervisor', not flipped to 'automation'), because resuming it would
+# only re-evaluate the step-12 checkpoint against a page where the hold is
+# already posted and re-escalate. Documented cut: that loop's thread stays
+# blocked until the process exits. See MERIDIAN_ADAPTATION_REPORT.md.
+# ---------------------------------------------------------------------------
+
+
+class SupervisorTakeoverError(RuntimeError):
+    pass
+
+
+def _mark_takeover_complete(run_id: str, status: str) -> None:
+    conn = sqlite3.connect(escalation.SESSIONS_DB_PATH)
+    try:
+        conn.execute(
+            "UPDATE runs SET owner='supervisor', status=?, updated_at=datetime('now') WHERE run_id=?",
+            (status, run_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _takeover_step(step, ctx: RunContext) -> None:
+    resolved = None
+    if step.locator is not None:
+        resolved = resolve_locator(step.locator.strategies, ctx)
+    guardrails.check_action_type(step.action.type, ctx.artifact.guardrails.allowed_action_types)
+    ACTION_REGISTRY.get(step.action.type)(step.action, resolved, ctx)
+
+    if step.wait is not None and step.wait.type == "network_idle":
+        try:
+            ctx.page.wait_for_load_state("networkidle", timeout=step.wait.timeout_ms)
+        except PWTimeoutError:
+            pass
+
+    timeout_ms = step.wait.timeout_ms if (step.wait and step.wait.type == "visible") else 4000
+    last = None
+    for _ in range(3):
+        check = evaluate_checkpoint(step.checkpoint, ctx, resolved, timeout_ms=timeout_ms)
+        ctx.log.event(
+            "supervisor_step", step_id=step.step_id, matched=check.matched,
+            outcome_code=check.outcome_code, detail=check.detail,
+        )
+        if check.matched and check.outcome_code:
+            raise SupervisorTakeoverError(
+                f"supervisor replay hit business outcome {check.outcome_code} at step {step.step_id} "
+                "(likely bad supervisor credentials)"
+            )
+        if check.matched:
+            return
+        last = check.detail
+        ctx.page.wait_for_timeout(1000)
+    raise SupervisorTakeoverError(
+        f"step {step.step_id} checkpoint failed under supervisor replay: {last}"
+    )
+
+
+def supervisor_takeover(run_id: str, supervisor_creds: dict, hold_context: dict | None = None) -> dict:
+    """Attach to the paused run's live browser, sign on as the supervisor,
+    and replay the capability to completion in that same session. Returns
+    the captured outputs (e.g. {"hold_confirmation": "..."})."""
+    row = escalation.get_run(run_id)
+    if row is None:
+        raise SupervisorTakeoverError(f"no run {run_id!r} in the session store")
+    if row["status"] != "paused":
+        raise SupervisorTakeoverError(f"run {run_id!r} is not paused (status: {row['status']})")
+    if row["pause_reason"] == "risk_confirmation_required":
+        raise SupervisorTakeoverError(
+            f"run {run_id!r} is paused at the proactive risk gate, not a reactive escalation — "
+            "confirm it through the chat / operator-console flow, not supervisor takeover"
+        )
+
+    capability_id = row["capability_id"]
+    cap_path = _capability_path(capability_id)
+    if cap_path is None:
+        raise SupervisorTakeoverError(f"no compiled artifact for capability {capability_id!r}")
+    artifact = Capability.load(cap_path)
+
+    merged = dict((_reactive_context.get(run_id) or {}).get("params") or {})
+    merged.update(hold_context or {})
+    merged["operator_id"] = supervisor_creds["operator_id"]
+    merged["password"] = supervisor_creds["password"]
+    merged["branch"] = supervisor_creds["branch"]
+    try:
+        params = validate_inputs(artifact, merged)
+    except InputValidationError as exc:
+        raise SupervisorTakeoverError(
+            f"cannot replay {capability_id!r} as supervisor: {exc}. Supply the missing field(s) in "
+            "the request body alongside the supervisor credentials."
+        ) from exc
+
+    rdir = Path("evidence/runs") / run_id
+    (rdir / "screenshots").mkdir(parents=True, exist_ok=True)
+    log = StepLogWriter(rdir / "log.jsonl", artifact.evidence_policy.redact_fields)
+    log.event(
+        "supervisor_takeover_start", run_id=run_id, supervisor_id=supervisor_creds["operator_id"],
+        paused_step=row["current_step_id"], pause_reason=row["pause_reason"],
+    )
+    allowed_origin = guardrails.derive_origin(artifact.target.entry_point)
+
+    # Playwright's sync API needs its own thread with no running event loop —
+    # this handler runs on a Flask worker thread that already has one, so the
+    # attach + replay happens on a dedicated thread.
+    box: dict = {}
+
+    def _browser_work() -> None:
+        try:
+            with sync_playwright() as pw:
+                try:
+                    browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
+                except Exception as exc:
+                    raise SupervisorTakeoverError(
+                        f"could not attach to the paused run's browser on CDP port {CDP_PORT}: {exc}"
+                    ) from exc
+
+                context = browser.contexts[0]
+                page = context.pages[0] if context.pages else context.new_page()
+                log.attach_page(page)
+                ctx = RunContext(
+                    page=page, artifact=artifact, params=params, run_id=run_id,
+                    evidence_dir=rdir, log=log, allowed_origin=allowed_origin,
+                )
+                # Fresh sign-on wipes whatever teller state the review page
+                # held; the supervisor replays the flow from the top in the
+                # same window.
+                page.goto(artifact.target.entry_point)
+                for step in artifact.steps:
+                    _takeover_step(step, ctx)
+                box["outputs"] = {o.name: ctx.outputs.get(o.name) for o in artifact.outputs}
+                # Detach before the page dies with this block — later
+                # log.event() calls must not rescan a closed page.
+                log.attach_page(None)
+        except BaseException as exc:  # re-raised on the calling thread below
+            box["error"] = exc
+
+    t = threading.Thread(target=_browser_work, daemon=True)
+    t.start()
+    t.join()
+    if "outputs" not in box:
+        err = box.get("error")
+        if isinstance(err, SupervisorTakeoverError):
+            log.event("supervisor_takeover_failed", detail=str(err))
+            raise err
+        raise SupervisorTakeoverError(f"supervisor replay errored: {err}") from err
+    outputs = box["outputs"]
+
+    if not any(outputs.values()):
+        _mark_takeover_complete(run_id, "hard_failure")
+        log.event("supervisor_takeover_failed", detail=f"no outputs captured: {outputs}")
+        raise SupervisorTakeoverError(f"supervisor replay produced no outputs: {outputs}")
+
+    _mark_takeover_complete(run_id, "success")
+    log.event("run_end", status="success", via="supervisor_takeover", outputs=outputs)
+    _reactive_context.pop(run_id, None)
+    return outputs
+
+
+@app.route("/api/runs/<run_id>/supervisor-resume", methods=["POST"])
+def supervisor_resume(run_id: str):
+    body = request.get_json(silent=True) or {}
+    creds = {
+        "operator_id": (body.get("supervisor_id") or body.get("operator_id") or "").strip(),
+        "password": body.get("password") or "",
+        "branch": (body.get("branch") or "").strip(),
+    }
+    if not creds["operator_id"] or not creds["password"] or not creds["branch"]:
+        return jsonify({"error": "supervisor_id, password and branch are all required"}), 400
+
+    hold_context = {
+        k: v for k, v in body.items()
+        if k not in ("supervisor_id", "operator_id", "password", "branch")
+    }
+    try:
+        outputs = supervisor_takeover(run_id, creds, hold_context or None)
+    except SupervisorTakeoverError as exc:
+        msg = str(exc)
+        code = 404 if msg.startswith("no run") else 409 if ("not paused" in msg or "risk gate" in msg) else 400
+        return jsonify({"error": msg}), code
+    except Exception as exc:  # pragma: no cover - defensive
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+    confirmation = outputs.get("hold_confirmation") or next(iter(outputs.values()), None)
+    return jsonify(
+        {
+            "run_id": run_id,
+            "status": "success",
+            "resumed_by": "supervisor",
+            "supervisor_id": creds["operator_id"],
+            "outputs": outputs,
+            "confirmation_number": confirmation,
+        }
+    ), 200
 
 
 # ---------------------------------------------------------------------------
